@@ -6,13 +6,9 @@
       "type": "object",
       "description": "Represents a user profile in the Convo application.",
       "properties": {
-        "id": {
+        "uid": {
           "type": "string",
-          "description": "Unique identifier for the user profile."
-        },
-        "username": {
-          "type": "string",
-          "description": "The user's chosen username."
+          "description": "Unique identifier for the user profile, from Firebase Auth."
         },
         "email": {
           "type": "string",
@@ -23,7 +19,7 @@
           "type": "string",
           "description": "The user's display name, shown in the app."
         },
-        "profilePictureUrl": {
+        "photoURL": {
           "type": "string",
           "description": "URL of the user's profile picture.",
           "format": "uri"
@@ -39,8 +35,7 @@
         }
       },
       "required": [
-        "id",
-        "username",
+        "uid",
         "email",
         "displayName"
       ]
@@ -51,23 +46,19 @@
       "type": "object",
       "description": "Represents a single chat message.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the chat message."
-        },
         "senderId": {
           "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N ChatMessage) The ID of the user who sent the message."
+          "description": "The ID of the user who sent the message."
         },
-        "roomId": {
+        "chatId": {
           "type": "string",
           "description": "The unique identifier of the chat room the message belongs to."
         },
-        "content": {
+        "text": {
           "type": "string",
           "description": "The text content of the message."
         },
-        "timestamp": {
+        "createdAt": {
           "type": "string",
           "description": "Timestamp of when the message was sent.",
           "format": "date-time"
@@ -78,11 +69,10 @@
         }
       },
       "required": [
-        "id",
         "senderId",
-        "roomId",
-        "content",
-        "timestamp"
+        "chatId",
+        "text",
+        "createdAt"
       ]
     },
     "ChatRoom": {
@@ -91,10 +81,6 @@
       "type": "object",
       "description": "Represents a one-to-one chat room between two users.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the chat room."
-        },
         "users": {
           "type": "array",
           "items": {
@@ -102,14 +88,25 @@
           },
           "description": "Array containing the UIDs of the two users in the chat room."
         },
-        "lastMessageTimestamp": {
+        "userDetails": {
+            "type": "object",
+            "description": "Map containing the user profiles of the chat participants."
+        },
+        "lastMessage": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"},
+                "createdAt": {"type": "string", "format": "date-time"}
+            },
+            "description": "The last message sent in the chat room."
+        },
+        "createdAt": {
           "type": "string",
-          "description": "Timestamp of the last message sent in the chat room.",
+          "description": "Timestamp of when the chat room was created.",
           "format": "date-time"
         }
       },
       "required": [
-        "id",
         "users"
       ]
     }
@@ -121,60 +118,23 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores user profiles. Uses the document ID as the user ID for ownership.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
-        }
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
       },
-      {
-        "path": "/chats/{chatId}",
-        "definition": {
-          "entityName": "ChatRoom",
-          "schema": {
-            "$ref": "#/backend/entities/ChatRoom"
-          },
-          "description": "Stores chat room metadata. `users` array defines the members of the chat, which are used for authorization.",
-          "params": [
-            {
-              "name": "chatId",
-              "description": "The unique identifier of the chat room."
-            }
-          ]
-        }
+      "description": "Stores user profiles. Uses the document ID as the user ID for ownership."
+    },
+    "/chats/{chatId}": {
+      "schema": {
+        "$ref": "#/entities/ChatRoom"
       },
-      {
-        "path": "/chats/{chatId}/messages/{messageId}",
-        "definition": {
-          "entityName": "ChatMessage",
-          "schema": {
-            "$ref": "#/backend/entities/ChatMessage"
-          },
-          "description": "Stores chat messages within chat rooms. Authorization depends on the `chatId`. Security rules check if the user is a participant in the parent `chats` document.",
-          "params": [
-            {
-              "name": "chatId",
-              "description": "The unique identifier of the chat room."
-            },
-            {
-              "name": "messageId",
-              "description": "The unique identifier of the chat message."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed for direct document access and simple queries, which aligns with the application's current implementation. User profiles are stored at the root of a 'users' collection, making them easy to query. Chat rooms and their sub-collections of messages also follow a straightforward path structure ('chats/{chatId}/messages/{messageId}'). This simplifies security rules and application logic."
+      "description": "Stores chat room metadata. `users` array defines the members of the chat."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": {
+        "$ref": "#/entities/ChatMessage"
+      },
+      "description": "Stores chat messages within chat rooms."
+    }
   }
 }

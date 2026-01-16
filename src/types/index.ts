@@ -14,6 +14,7 @@ export interface Message {
   text: string;
   senderId: string;
   createdAt: Timestamp;
+  isModerated?: boolean;
 }
 
 export interface Chat {

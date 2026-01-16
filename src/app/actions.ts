@@ -29,8 +29,6 @@ import { revalidatePath } from 'next/cache';
 import { moderateChatMessage } from '@/ai/flows/moderate-chat-message';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
-const { auth, firestore: db } = initializeFirebase();
-
 const signUpSchema = z
   .object({
     displayName: z.string().min(3, 'Display name must be at least 3 characters'),
@@ -56,6 +54,7 @@ export async function signUp(prevState: any, formData: FormData) {
   const { email, password, displayName } = validatedFields.data;
 
   try {
+    const { auth, firestore: db } = initializeFirebase();
     if (!auth) {
       throw new Error("Authentication service is not initialized.");
     }
@@ -106,6 +105,7 @@ export async function login(prevState: any, formData: FormData) {
   const { email, password } = validatedFields.data;
 
   try {
+    const { auth } = initializeFirebase();
     if (!auth) {
       throw new Error("Authentication service is not initialized.");
     }
@@ -121,6 +121,7 @@ export async function login(prevState: any, formData: FormData) {
 }
 
 export async function signOut() {
+  const { auth, firestore: db } = initializeFirebase();
   if (!auth) {
     throw new Error("Authentication service is not initialized.");
   }
@@ -136,6 +137,7 @@ export async function signOut() {
 }
 
 export async function createOrGetChat(currentUserId: string, otherUserId: string) {
+  const { firestore: db } = initializeFirebase();
   const chatMembers = [currentUserId, otherUserId].sort();
   const chatId = chatMembers.join('_');
 
@@ -186,7 +188,8 @@ export async function sendMessage(formData: FormData) {
     if (moderationResult.isHarmful) {
       return { error: `Message not sent. Reason: ${moderationResult.reason}` };
     }
-
+    
+    const { firestore: db } = initializeFirebase();
     const chatRef = doc(db, 'chats', chatId);
     const messagesColRef = collection(chatRef, 'messages');
     
@@ -215,6 +218,7 @@ export async function sendMessage(formData: FormData) {
 
 export async function updateUserPresence(userId: string, isOnline: boolean) {
   if (!userId) return;
+  const { firestore: db } = initializeFirebase();
   const userRef = doc(db, 'users', userId);
   try {
     await updateDoc(userRef, {

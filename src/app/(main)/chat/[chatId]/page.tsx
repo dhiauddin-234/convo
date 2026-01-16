@@ -8,9 +8,9 @@ import { doc, getDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { notFound } from "next/navigation";
 
-const { firestore: db } = initializeFirebase();
 
 async function getChatDetails(chatId: string, currentUserId: string): Promise<{ chat: Chat; otherUser: AppUser } | null> {
+    const { firestore: db } = initializeFirebase();
     const chatRef = doc(db, 'chats', chatId);
     const chatSnap = await getDoc(chatRef);
 

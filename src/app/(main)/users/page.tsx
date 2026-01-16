@@ -5,11 +5,10 @@ import { UserList } from '@/components/chat/UserList';
 import type { AppUser } from '@/types';
 import { getAuth } from "firebase/auth";
 
-const { firestore: db } = initializeFirebase();
-
 async function getUsers(currentUserId: string | undefined) {
     if(!currentUserId) return [];
     
+    const { firestore: db } = initializeFirebase();
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('uid', '!=', currentUserId));
     const querySnapshot = await getDocs(q);
