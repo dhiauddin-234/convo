@@ -8,7 +8,7 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase/config';
+import { initializeFirebase } from '@/firebase';
 import { redirect } from 'next/navigation';
 import {
   collection,
@@ -28,6 +28,8 @@ import {
 import { revalidatePath } from 'next/cache';
 import { moderateChatMessage } from '@/ai/flows/moderate-chat-message';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+
+const { auth, firestore: db } = initializeFirebase();
 
 const signUpSchema = z
   .object({

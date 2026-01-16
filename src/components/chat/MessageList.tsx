@@ -3,10 +3,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { initializeFirebase } from '@/firebase';
 import type { Message } from '@/types';
 import { ChatMessage } from './ChatMessage';
 import { Skeleton } from '../ui/skeleton';
+
+const { firestore: db } = initializeFirebase();
 
 interface MessageListProps {
   chatId: string;

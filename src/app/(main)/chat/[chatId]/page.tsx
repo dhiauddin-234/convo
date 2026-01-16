@@ -2,13 +2,13 @@
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { MessageList } from "@/components/chat/MessageList";
-import { db, auth } from "@/lib/firebase/config";
+import { initializeFirebase } from "@/firebase";
 import type { Chat, AppUser } from "@/types";
 import { doc, getDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { app } from "@/lib/firebase/config";
 import { notFound } from "next/navigation";
 
+const { firestore: db } = initializeFirebase();
 
 async function getChatDetails(chatId: string, currentUserId: string): Promise<{ chat: Chat; otherUser: AppUser } | null> {
     const chatRef = doc(db, 'chats', chatId);
@@ -40,7 +40,8 @@ async function getChatDetails(chatId: string, currentUserId: string): Promise<{ 
 
 
 export default async function ChatRoomPage({ params }: { params: { chatId: string } }) {
-    const currentUserId = getAuth(app).currentUser?.uid;
+    const auth = getAuth(initializeFirebase().firebaseApp);
+    const currentUserId = auth.currentUser?.uid;
     if(!currentUserId) return notFound();
 
     const data = await getChatDetails(params.chatId, currentUserId);

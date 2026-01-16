@@ -1,8 +1,8 @@
 'use client';
 
-import { useAuth } from '@/lib/hooks/useAuth';
+import { useUser } from '@/firebase/provider';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Loader2, LogOut, MessageSquare, Users } from 'lucide-react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { signOut, updateUserPresence } from '@/app/actions';
 import { SidebarChats } from '@/components/chat/SidebarChats';
 
 function PresenceUpdater() {
-  const { user } = useAuth();
+  const { user } = useUser();
   
   useEffect(() => {
     if (user?.uid) {
@@ -38,7 +38,7 @@ function PresenceUpdater() {
 
 
 export default function MainLayout({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, isUserLoading: loading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
 

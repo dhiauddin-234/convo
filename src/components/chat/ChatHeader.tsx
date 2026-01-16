@@ -2,12 +2,14 @@
 'use client';
 
 import { UserAvatar } from "@/components/UserAvatar";
-import { db } from "@/lib/firebase/config";
+import { initializeFirebase } from "@/firebase";
 import type { AppUser } from "@/types";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from 'date-fns';
 import { SidebarTrigger } from "../ui/sidebar";
+
+const { firestore: db } = initializeFirebase();
 
 interface ChatHeaderProps {
     otherUser: AppUser;

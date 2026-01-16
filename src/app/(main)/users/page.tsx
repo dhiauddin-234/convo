@@ -1,11 +1,11 @@
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase/config';
+import { initializeFirebase } from '@/firebase';
 import { UserList } from '@/components/chat/UserList';
 import type { AppUser } from '@/types';
 import { getAuth } from "firebase/auth";
-import { app } from "@/lib/firebase/config";
 
+const { firestore: db } = initializeFirebase();
 
 async function getUsers(currentUserId: string | undefined) {
     if(!currentUserId) return [];
@@ -20,7 +20,8 @@ async function getUsers(currentUserId: string | undefined) {
 export default async function UsersPage() {
     // This is a workaround to get current user on server.
     // In a real app, you would use a session management library.
-    const currentUserId = getAuth(app).currentUser?.uid;
+    const auth = getAuth(initializeFirebase().firebaseApp);
+    const currentUserId = auth.currentUser?.uid;
     const users = await getUsers(currentUserId);
 
   return (

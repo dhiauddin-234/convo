@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { initializeFirebase } from '@/firebase';
 import type { AppUser, Chat } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -11,6 +11,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/UserAvatar';
 import { formatDistanceToNow } from 'date-fns';
+
+const { firestore: db } = initializeFirebase();
 
 interface SidebarChatsProps {
   currentUser: AppUser;

@@ -95,13 +95,12 @@
           "type": "string",
           "description": "Unique identifier for the chat room."
         },
-        "user1Id": {
-          "type": "string",
-          "description": "Reference to UserProfile. The ID of the first user in the chat room."
-        },
-        "user2Id": {
-          "type": "string",
-          "description": "Reference to UserProfile. The ID of the second user in the chat room."
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array containing the UIDs of the two users in the chat room."
         },
         "lastMessageTimestamp": {
           "type": "string",
@@ -111,8 +110,7 @@
       },
       "required": [
         "id",
-        "user1Id",
-        "user2Id"
+        "users"
       ]
     }
   },
@@ -125,13 +123,13 @@
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}/profile",
+        "path": "/users/{userId}",
         "definition": {
           "entityName": "UserProfile",
           "schema": {
             "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores user profiles. Uses path-based ownership for private user data.",
+          "description": "Stores user profiles. Uses the document ID as the user ID for ownership.",
           "params": [
             {
               "name": "userId",
@@ -141,32 +139,32 @@
         }
       },
       {
-        "path": "/chatRooms/{roomId}",
+        "path": "/chats/{chatId}",
         "definition": {
           "entityName": "ChatRoom",
           "schema": {
             "$ref": "#/backend/entities/ChatRoom"
           },
-          "description": "Stores chat room metadata. `user1Id` and `user2Id` define the members of the chat, which are used for authorization.",
+          "description": "Stores chat room metadata. `users` array defines the members of the chat, which are used for authorization.",
           "params": [
             {
-              "name": "roomId",
+              "name": "chatId",
               "description": "The unique identifier of the chat room."
             }
           ]
         }
       },
       {
-        "path": "/chatRooms/{roomId}/chatMessages/{messageId}",
+        "path": "/chats/{chatId}/messages/{messageId}",
         "definition": {
           "entityName": "ChatMessage",
           "schema": {
             "$ref": "#/backend/entities/ChatMessage"
           },
-          "description": "Stores chat messages within chat rooms. Authorization depends on the `roomId`. Security rules check if the user is either `user1Id` or `user2Id` in the parent `chatRooms` document.",
+          "description": "Stores chat messages within chat rooms. Authorization depends on the `chatId`. Security rules check if the user is a participant in the parent `chats` document.",
           "params": [
             {
-              "name": "roomId",
+              "name": "chatId",
               "description": "The unique identifier of the chat room."
             },
             {
@@ -177,6 +175,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to ensure security, scalability, and debuggability, following the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are not Filters). Authorization Independence is achieved through denormalization. For example, access to `chatMessages` is governed by the `chatRooms` document; therefore, authorization context is denormalized into the `chatMessages` documents to eliminate `get()` calls in security rules. Structural Segregation is used by separating user profiles from chat rooms and messages. Access Modeling uses path-based ownership for user profiles (`/users/{userId}/profile`) and a membership model (implicitly through `user1Id` and `user2Id` on `chatRooms`) for chat room access. This structure supports the required QAPs by enabling secure list operations on chat rooms and messages based on user ID and membership."
+    "reasoning": "The Firestore structure is designed for direct document access and simple queries, which aligns with the application's current implementation. User profiles are stored at the root of a 'users' collection, making them easy to query. Chat rooms and their sub-collections of messages also follow a straightforward path structure ('chats/{chatId}/messages/{messageId}'). This simplifies security rules and application logic."
   }
 }

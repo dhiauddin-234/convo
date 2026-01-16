@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAvatar } from '@/components/UserAvatar';
 import { createOrGetChat } from '@/app/actions';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { useUser } from '@/firebase/provider';
 import { useRouter } from 'next/navigation';
 import { Loader2, MessageSquarePlus } from 'lucide-react';
 
@@ -19,7 +19,7 @@ interface UserListProps {
 export function UserList({ initialUsers }: UserListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPending, startTransition] = useTransition();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser } = useUser();
   const router = useRouter();
 
   const filteredUsers = initialUsers.filter(user =>
