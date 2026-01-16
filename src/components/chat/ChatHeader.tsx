@@ -32,7 +32,7 @@ export function ChatHeader({ otherUser: initialOtherUser }: ChatHeaderProps) {
             <div className="flex-1">
                 <p className="font-semibold font-headline text-lg">{otherUser.displayName}</p>
                 <p className="text-sm text-muted-foreground">
-                    {otherUser.isOnline ? <span className="text-green-500">Online</span> : 
+                    {otherUser.isOnline ? <span className="text-online">Online</span> : 
                     (otherUser.lastSeen ? `Last seen ${formatDistanceToNow(otherUser.lastSeen.toDate(), { addSuffix: true })}` : 'Offline')}
                 </p>
             </div>
