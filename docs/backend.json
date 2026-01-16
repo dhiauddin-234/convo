@@ -1,0 +1,182 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile in the Convo application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's chosen username."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name, shown in the app."
+        },
+        "profilePictureUrl": {
+          "type": "string",
+          "description": "URL of the user's profile picture.",
+          "format": "uri"
+        },
+        "lastSeen": {
+          "type": "string",
+          "description": "Timestamp of the user's last activity.",
+          "format": "date-time"
+        },
+        "isOnline": {
+          "type": "boolean",
+          "description": "Boolean indicating whether the user is currently online."
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email",
+        "displayName"
+      ]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single chat message.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the chat message."
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N ChatMessage) The ID of the user who sent the message."
+        },
+        "roomId": {
+          "type": "string",
+          "description": "The unique identifier of the chat room the message belongs to."
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the message."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the message was sent.",
+          "format": "date-time"
+        },
+        "isModerated": {
+          "type": "boolean",
+          "description": "Indicates whether the message has been moderated."
+        }
+      },
+      "required": [
+        "id",
+        "senderId",
+        "roomId",
+        "content",
+        "timestamp"
+      ]
+    },
+    "ChatRoom": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatRoom",
+      "type": "object",
+      "description": "Represents a one-to-one chat room between two users.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the chat room."
+        },
+        "user1Id": {
+          "type": "string",
+          "description": "Reference to UserProfile. The ID of the first user in the chat room."
+        },
+        "user2Id": {
+          "type": "string",
+          "description": "Reference to UserProfile. The ID of the second user in the chat room."
+        },
+        "lastMessageTimestamp": {
+          "type": "string",
+          "description": "Timestamp of the last message sent in the chat room.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "user1Id",
+        "user2Id"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}/profile",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profiles. Uses path-based ownership for private user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/chatRooms/{roomId}",
+        "definition": {
+          "entityName": "ChatRoom",
+          "schema": {
+            "$ref": "#/backend/entities/ChatRoom"
+          },
+          "description": "Stores chat room metadata. `user1Id` and `user2Id` define the members of the chat, which are used for authorization.",
+          "params": [
+            {
+              "name": "roomId",
+              "description": "The unique identifier of the chat room."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/chatRooms/{roomId}/chatMessages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores chat messages within chat rooms. Authorization depends on the `roomId`. Security rules check if the user is either `user1Id` or `user2Id` in the parent `chatRooms` document.",
+          "params": [
+            {
+              "name": "roomId",
+              "description": "The unique identifier of the chat room."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier of the chat message."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure security, scalability, and debuggability, following the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are not Filters). Authorization Independence is achieved through denormalization. For example, access to `chatMessages` is governed by the `chatRooms` document; therefore, authorization context is denormalized into the `chatMessages` documents to eliminate `get()` calls in security rules. Structural Segregation is used by separating user profiles from chat rooms and messages. Access Modeling uses path-based ownership for user profiles (`/users/{userId}/profile`) and a membership model (implicitly through `user1Id` and `user2Id` on `chatRooms`) for chat room access. This structure supports the required QAPs by enabling secure list operations on chat rooms and messages based on user ID and membership."
+  }
+}

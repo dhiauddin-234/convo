@@ -1,0 +1,191 @@
+/**
+ * Core Philosophy: This ruleset enforces a security model with two distinct patterns:
+ * 1. User-Ownership Model: All private user data, specifically user profiles, is stored in a path dedicated to that user (`/users/{userId}`). Access is strictly limited to the authenticated owner of that data path.
+ * 2. Shared Access Model: Collaborative data, such as one-on-one chat rooms, is secured by membership. Access to a chat room and its messages is granted only to the two participants defined within the chat room document itself.
+ *
+ * Data Structure: The data is organized into two main top-level collections:
+ * - `/users`: Contains user-specific data. Each user has their own document scope (`/users/{userId}`).
+ * - `/chatRooms`: A collection of all chat rooms. Each room contains metadata about the participants and contains a subcollection for its messages.
+ *
+ * Key Security Decisions:
+ * - User Privacy: Users can only read and write their own profile data. They cannot list or view other users' profiles directly.
+ * - Secure Chat Membership: Access to a chat room's content (`/chatRooms/{roomId}/chatMessages`) requires a lookup on the parent chat room document to verify that the requesting user is one of the two designated participants. This centralizes the authorization logic.
+ * - No Public Listing: Broadly listing all chat rooms is disallowed to prevent data leakage. Clients must know the specific ID of a chat room to access it.
+ *
+ * Denormalization for Authorization: Chat room membership is defined by the `user1Id` and `user2Id` fields directly on each `/chatRooms/{roomId}` document. Security rules for the `/chatMessages` subcollection use a `get()` call to this parent document to verify the requesting user's membership before granting access. This is a deliberate design choice that centralizes access control for an entire data tree (the chat room and all its messages) in a single parent document.
+ *
+ * Structural Segregation: Private user data (`/users`) is kept entirely separate from the shared, collaborative chat data (`/chatRooms`). This clear separation simplifies the security rules and improves query performance.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------
+    // --- Helper Functions
+    // ---------------------------
+
+    /**
+     * Returns true if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the requesting user's UID matches the provided userId.
+     * This is the core function for enforcing the "User-Ownership Model".
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership on an existing document. Used for update/delete operations
+     * to ensure the document exists before attempting the operation.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Checks if the requesting user is the sender of a given chat message.
+     */
+    function isSender(messageData) {
+      return request.auth.uid == messageData.senderId;
+    }
+
+    /**
+     * Checks if the requesting user is one of the two participants in a chat room.
+     */
+    function isChatParticipant(chatRoomData) {
+      return request.auth.uid == chatRoomData.user1Id || request.auth.uid == chatRoomData.user2Id;
+    }
+
+    /**
+     * Performs a lookup to the parent chat room document to verify
+     * that the requesting user is a member. This is crucial for securing
+     * subcollection access (e.g., for chat messages).
+     */
+    function isMemberOfParentChatRoom(roomId) {
+      let chatRoomDoc = get(/databases/$(database)/documents/chatRooms/$(roomId));
+      return chatRoomDoc != null && isChatParticipant(chatRoomDoc.data);
+    }
+    
+    // ---------------------------
+    // --- Validation Functions (Prototyping Mode)
+    // --- These functions only validate fields critical for auth and relations.
+    // ---------------------------
+
+    /**
+     * On profile creation, validates that the document's internal `id` field
+     * matches the user's auth UID, enforcing relational integrity.
+     */
+    function isNewProfileDataValid(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * On profile update, ensures the user's `id` is immutable.
+     */
+    function isProfileUpdateDataValid() {
+      return request.resource.data.id == resource.data.id;
+    }
+    
+    /**
+     * On chat room creation, validates the creator is a participant
+     * and the room ID is consistent.
+     */
+    function isNewChatRoomDataValid(roomId) {
+      let incomingData = request.resource.data;
+      return incomingData.id == roomId
+        && request.auth.uid in [incomingData.user1Id, incomingData.user2Id];
+    }
+
+    /**
+     * On chat room update, ensures critical relational IDs are immutable.
+     */
+    function isChatRoomUpdateDataValid() {
+      let incomingData = request.resource.data;
+      let existingData = resource.data;
+      return incomingData.id == existingData.id
+        && incomingData.user1Id == existingData.user1Id
+        && incomingData.user2Id == existingData.user2Id;
+    }
+
+    /**
+     * On chat message creation, validates sender, path, and ID consistency.
+     */
+    function isNewChatMessageDataValid(roomId, messageId) {
+      let incomingData = request.resource.data;
+      return incomingData.id == messageId
+        && incomingData.roomId == roomId
+        && isSender(incomingData);
+    }
+    
+    /**
+     * On chat message update, ensures critical relational IDs are immutable.
+     */
+    function isChatMessageUpdateDataValid() {
+      let incomingData = request.resource.data;
+      let existingData = resource.data;
+      return incomingData.id == existingData.id
+        && incomingData.roomId == existingData.roomId
+        && incomingData.senderId == existingData.senderId;
+    }
+
+    // ---------------------------
+    // --- Collection Rules
+    // ---------------------------
+
+    /**
+     * @description Secures a user's private profile document.
+     * @path /users/{userId}/profile
+     * @allow (get, create, update, delete) A user (auth.uid='user123') accessing their own profile at `/users/user123/profile`.
+     * @deny (get) A user (auth.uid='user456') trying to access another user's profile at `/users/user123/profile`.
+     * @deny (list) Any user trying to list documents under `/users/{userId}`.
+     * @principle Restricts access to a user's own data tree (Path-based Ownership).
+     */
+    match /users/{userId}/profile {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && isNewProfileDataValid(userId);
+      allow update: if isExistingOwner(userId) && isProfileUpdateDataValid();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secures chat room documents. Access is limited to the two participants.
+     * @path /chatRooms/{roomId}
+     * @allow (get) A user (auth.uid='user1') reading a chat room where `user1Id` is 'user1'.
+     * @allow (update) A user (auth.uid='user2') updating a chat room where `user2Id` is 'user2'.
+     * @deny (get) A user (auth.uid='user3') trying to read a chat room they are not a part of.
+     * @deny (list) Any user trying to list all chat rooms in the database.
+     * @principle Enforces shared access for a closed set of collaborators defined within the document.
+     */
+    match /chatRooms/{roomId} {
+      allow get: if isSignedIn() && isChatParticipant(resource.data);
+      allow list: if false;
+      allow create: if isSignedIn() && isNewChatRoomDataValid(roomId);
+      allow update: if isSignedIn() && resource != null && isChatParticipant(resource.data) && isChatRoomUpdateDataValid();
+      allow delete: if isSignedIn() && resource != null && isChatParticipant(resource.data);
+    }
+
+    /**
+     * @description Secures chat messages within a chat room.
+     * @path /chatRooms/{roomId}/chatMessages/{messageId}
+     * @allow (list, get) A user (auth.uid='user1') reading messages in a chat room where they are a participant.
+     * @allow (create) A user (auth.uid='user1') creating a message with `senderId: 'user1'` in a chat room they belong to.
+     * @allow (delete) A user (auth.uid='user1') deleting their own message (where `senderId` is 'user1').
+     * @deny (get) A user (auth.uid='user3') trying to read messages in a room they are not a member of.
+     * @deny (update) A user (auth.uid='user1') trying to update a message sent by 'user2'.
+     * @principle Secures a subcollection by checking for membership in the parent document.
+     */
+    match /chatRooms/{roomId}/chatMessages/{messageId} {
+      allow get: if isMemberOfParentChatRoom(roomId);
+      allow list: if isMemberOfParentChatRoom(roomId);
+      allow create: if isMemberOfParentChatRoom(roomId) && isNewChatMessageDataValid(roomId, messageId);
+      allow update: if resource != null && isSender(resource.data) && isMemberOfParentChatRoom(roomId) && isChatMessageUpdateDataValid();
+      allow delete: if resource != null && isSender(resource.data) && isMemberOfParentChatRoom(roomId);
+    }
+  }
+}
