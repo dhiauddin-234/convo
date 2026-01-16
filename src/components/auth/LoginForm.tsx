@@ -1,45 +1,62 @@
-
 "use client";
 
-import { useFormStatus } from "react-dom";
-import { login } from "@/app/actions";
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useAuth } from "@/firebase/provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
-const initialState = {
-  message: '',
-  errors: {},
-};
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button className="w-full" type="submit" disabled={pending}>
-      {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      Sign In
-    </Button>
-  );
-}
-
 export function LoginForm() {
-  const [state, formAction] = useActionState(login, initialState);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  const auth = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (state?.message) {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // This stops the page from reloading
+    setLoading(true);
+    setError(null);
+
+    if (!auth) {
+        toast({
+            variant: "destructive",
+            title: "Login Failed",
+            description: "Authentication service is not available.",
+        });
+        setLoading(false);
+        return;
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // The onAuthStateChanged listener in our FirebaseProvider will detect the successful login.
+      // We can now safely navigate to the chat page.
+      router.push('/chat');
+    } catch (error: any) {
+      let errorMessage = 'An error occurred during login.';
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        errorMessage = 'Invalid email or password.';
+      }
+      setError(errorMessage);
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: state.message,
+        description: errorMessage,
       });
+    } finally {
+        setLoading(false);
     }
-  }, [state, toast]);
+  };
 
   return (
     <Card className="w-full max-w-sm">
@@ -49,21 +66,38 @@ export function LoginForm() {
           Enter your email below to login to your account.
         </CardDescription>
       </CardHeader>
-      <form action={formAction}>
+      <form onSubmit={handleSubmit}>
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" placeholder="m@example.com" required />
-            {state?.errors?.email && <p className="text-sm text-destructive">{state.errors.email[0]}</p>}
+            <Input 
+              id="email" 
+              name="email" 
+              type="email" 
+              placeholder="m@example.com" 
+              required 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required />
-             {state?.errors?.password && <p className="text-sm text-destructive">{state.errors.password[0]}</p>}
+            <Input 
+              id="password" 
+              name="password" 
+              type="password" 
+              required 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
+           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <SubmitButton />
+          <Button className="w-full" type="submit" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Sign In
+          </Button>
           <div className="text-center text-sm">
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="underline text-primary">
