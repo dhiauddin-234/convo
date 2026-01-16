@@ -10,42 +10,50 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    function isChatParticipant(chatData) {
-      return request.auth.uid in chatData.users;
+    // Checks if the requesting user's UID is in a list of UIDs.
+    function isParticipant(userList) {
+      return request.auth.uid in userList;
     }
 
-    function isMemberOfParentChat(chatId) {
+    // Checks if the user is a participant of the parent chat.
+    // This is for subcollections like 'messages' and requires one read.
+    function isParentChatParticipant(chatId) {
       let chatDoc = get(/databases/$(database)/documents/chats/$(chatId));
-      return chatDoc != null && isChatParticipant(chatDoc.data);
+      return chatDoc != null && isParticipant(chatDoc.data.users);
     }
 
+    // Checks if the requesting user is the sender of a message.
     function isSender(messageData) {
       return request.auth.uid == messageData.senderId;
     }
 
     match /users/{userId} {
-      // Users should be able to read other user's public profile info to start a chat
-      allow get: if isSignedIn();
-      // Listing all users is needed for the 'discover' page
-      allow list: if isSignedIn();
-      // A user can only create, update, or delete their own profile
+      // Allow any signed-in user to view public profiles and list users for discovery.
+      allow get, list: if isSignedIn();
+      // A user can only create, update, or delete their own profile document.
       allow create, update, delete: if isOwner(userId);
     }
 
     match /chats/{chatId} {
-      // You can only interact with a chat if you are a participant
-      allow get, create, update, delete: if isMemberOfParentChat(chatId);
-      // Don't allow listing all chats for security.
+      // On create, user must be a participant in the new document's 'users' list.
+      allow create: if isSignedIn() && isParticipant(request.resource.data.users);
+
+      // On read/update/delete, user must be a participant in the existing document's 'users' list.
+      allow get, update, delete: if isSignedIn() && isParticipant(resource.data.users);
+
+      // Explicitly deny listing all chats for security reasons.
       allow list: if false;
     }
 
     match /chats/{chatId}/messages/{messageId} {
-      // You can read messages in a chat you are part of
-      allow get, list: if isMemberOfParentChat(chatId);
-      // You can create a message in a chat you are part of, and you must be the sender
-      allow create: if isMemberOfParentChat(chatId) && isSender(request.resource.data);
-      // You can only update or delete your own messages
-      allow update, delete: if isMemberOfParentChat(chatId) && isSender(resource.data);
+      // To read messages, user must be a participant of the parent chat.
+      allow get, list: if isParentChatParticipant(chatId);
+
+      // To create a message, user must be a participant and the specified sender.
+      allow create: if isParentChatParticipant(chatId) && isSender(request.resource.data);
+
+      // To update/delete a message, user must be a participant and the original sender.
+      allow update, delete: if isParentChatParticipant(chatId) && isSender(resource.data);
     }
   }
 }
