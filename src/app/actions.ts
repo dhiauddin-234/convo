@@ -24,6 +24,7 @@ import {
   orderBy,
   limit,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { moderateChatMessage } from '@/ai/flows/moderate-chat-message';
@@ -227,5 +228,54 @@ export async function updateUserPresence(userId: string, isOnline: boolean) {
     });
   } catch (error) {
     console.error("Error updating user presence:", error);
+  }
+}
+
+export async function updateUserProfile({ displayName, photoURL }: { displayName: string, photoURL?: string }) {
+  const { auth, firestore: db } = initializeFirebase();
+  const user = auth.currentUser;
+
+  if (!user) {
+    return { error: 'You must be logged in to update your profile.' };
+  }
+
+  try {
+    const updatePayload: { displayName: string; photoURL?: string } = { displayName };
+    if (photoURL) {
+      updatePayload.photoURL = photoURL;
+    }
+
+    // 1. Update Firebase Auth user profile
+    await updateProfile(user, updatePayload);
+
+    // 2. Update user document in /users
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, updatePayload);
+    
+    // 3. Update denormalized user data in all relevant chats
+    const chatsQuery = query(collection(db, 'chats'), where('users', 'array-contains', user.uid));
+    const chatsSnapshot = await getDocs(chatsQuery);
+
+    if (!chatsSnapshot.empty) {
+        const batch = writeBatch(db);
+        
+        chatsSnapshot.forEach(chatDoc => {
+            const chatRef = doc(db, 'chats', chatDoc.id);
+            const currentChatData = chatDoc.data();
+            const currentUserDetails = currentChatData.userDetails[user.uid];
+            
+            batch.update(chatRef, {
+                [`userDetails.${user.uid}`]: { ...currentUserDetails, ...updatePayload }
+            });
+        });
+        await batch.commit();
+    }
+
+    revalidatePath('/(main)', 'layout');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error updating profile:", error);
+    return { error: 'Failed to update profile: ' + error.message };
   }
 }

@@ -3,7 +3,7 @@
 import { useUser } from '@/firebase/provider';
 import { useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
-import { Loader2, LogOut, MessageSquare, Users } from 'lucide-react';
+import { Loader2, LogOut, MessageSquare, User, Users } from 'lucide-react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -105,6 +105,10 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="w-56">
                         <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <Link href="/profile"><User className="mr-2 h-4 w-4" />Profile</Link>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <form action={signOut}>
                             <DropdownMenuItem asChild>
