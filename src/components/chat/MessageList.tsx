@@ -2,11 +2,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, FirestoreError } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 import type { Message } from '@/types';
 import { ChatMessage } from './ChatMessage';
 import { Skeleton } from '../ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 const { firestore: db } = initializeFirebase();
 
@@ -19,21 +20,38 @@ export function MessageList({ chatId, currentUserId }: MessageListProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
+    if (!chatId || !currentUserId) {
+      setLoading(false);
+      return;
+    }
+
     const messagesQuery = query(
       collection(db, 'chats', chatId, 'messages'),
       orderBy('createdAt', 'asc')
     );
 
-    const unsubscribe = onSnapshot(messagesQuery, (querySnapshot) => {
-      const messagesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-      setMessages(messagesData);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(messagesQuery, 
+      (querySnapshot) => {
+        const messagesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+        setMessages(messagesData);
+        setLoading(false);
+      },
+      (error: FirestoreError) => {
+        console.error("MessageList listener error:", error);
+        toast({
+            variant: "destructive",
+            title: "Error loading messages",
+            description: "You may not have permission to view this chat.",
+        });
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
-  }, [chatId]);
+  }, [chatId, currentUserId, toast]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

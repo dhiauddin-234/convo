@@ -35,14 +35,15 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
+       // A user can query for chats they are a part of.
+      // The client-side query MUST enforce this (e.g., using `where('users', 'array-contains', request.auth.uid)`).
+      allow list: if isSignedIn();
+
       // On create, user must be a participant in the new document's 'users' list.
       allow create: if isSignedIn() && isParticipant(request.resource.data.users);
 
       // On read/update/delete, user must be a participant in the existing document's 'users' list.
       allow get, update, delete: if isSignedIn() && isParticipant(resource.data.users);
-
-      // Explicitly deny listing all chats for security reasons.
-      allow list: if false;
     }
 
     match /chats/{chatId}/messages/{messageId} {

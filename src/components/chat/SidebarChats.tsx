@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, FirestoreError } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 import type { AppUser, Chat } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,20 +11,26 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/UserAvatar';
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import type { User } from 'firebase/auth';
 
 const { firestore: db } = initializeFirebase();
 
 interface SidebarChatsProps {
-  currentUser: AppUser;
+  currentUser: User | null;
 }
 
 export function SidebarChats({ currentUser }: SidebarChatsProps) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (!currentUser.uid) return;
+    if (!currentUser?.uid) {
+        setLoading(false);
+        return;
+    }
 
     const chatsQuery = query(
       collection(db, 'chats'),
@@ -32,14 +38,25 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
       orderBy('lastMessage.createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(chatsQuery, (querySnapshot) => {
-      const chatsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chat));
-      setChats(chatsData);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(chatsQuery, 
+      (querySnapshot) => {
+        const chatsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chat));
+        setChats(chatsData);
+        setLoading(false);
+      },
+      (error: FirestoreError) => {
+        console.error("SidebarChats listener error:", error);
+        toast({
+            variant: "destructive",
+            title: "Error loading chats",
+            description: "There was a problem fetching your recent conversations.",
+        });
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
-  }, [currentUser.uid]);
+  }, [currentUser?.uid, toast]);
 
   if (loading) {
     return (
@@ -64,6 +81,7 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
   return (
     <div className="space-y-1">
       {chats.map(chat => {
+        if (!currentUser?.uid) return null;
         const otherUserId = chat.users.find(uid => uid !== currentUser.uid);
         if (!otherUserId || !chat.userDetails[otherUserId]) return null;
         
