@@ -87,9 +87,9 @@ export function MessageList({ chatId, currentUserId }: MessageListProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
       {messages.map(message => (
-          <ChatMessage key={message.id} message={message} isCurrentUser={message.senderId === currentUserId} />
+          <ChatMessage key={message.id} message={message} isCurrentUser={message.senderId === currentUserId} currentUserId={currentUserId} chatId={chatId} />
         ))
       }
       <div ref={messagesEndRef} />

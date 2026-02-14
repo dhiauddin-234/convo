@@ -32,6 +32,13 @@
         "isOnline": {
           "type": "boolean",
           "description": "Boolean indicating whether the user is currently online."
+        },
+        "pinnedChats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of chat IDs that the user has pinned."
         }
       },
       "required": [
@@ -66,6 +73,21 @@
         "isModerated": {
           "type": "boolean",
           "description": "Indicates whether the message has been moderated."
+        },
+        "reactions": {
+          "type": "object",
+          "description": "A map of user IDs to their emoji reaction.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "Indicates if the message has been soft-deleted."
+        },
+        "edited": {
+          "type": "boolean",
+          "description": "Indicates if the message has been edited."
         }
       },
       "required": [
@@ -89,25 +111,39 @@
           "description": "Array containing the UIDs of the two users in the chat room."
         },
         "userDetails": {
-            "type": "object",
-            "description": "Map containing the user profiles of the chat participants."
+          "type": "object",
+          "description": "Map containing the user profiles of the chat participants."
         },
         "lastMessage": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string"},
-                "createdAt": {"type": "string", "format": "date-time"},
-                "readBy": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                }
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
             },
-            "description": "The last message sent in the chat room."
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "readBy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "The last message sent in the chat room."
         },
         "createdAt": {
           "type": "string",
           "description": "Timestamp of when the chat room was created.",
           "format": "date-time"
+        },
+        "unreadCounts": {
+          "type": "object",
+          "description": "A map of user IDs to their unread message count.",
+          "additionalProperties": {
+            "type": "number"
+          }
         }
       },
       "required": [

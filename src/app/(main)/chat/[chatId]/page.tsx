@@ -22,10 +22,22 @@ export default function ChatRoomPage() {
     const { data: chat, isLoading: isChatLoading } = useDoc<Chat>(chatRef);
 
     useEffect(() => {
-        if (chat && currentUser && chat.lastMessage && chat.lastMessage.readBy && !chat.lastMessage.readBy.includes(currentUser.uid) && chatRef) {
+        if (!chatRef || !currentUser || !chat) return;
+
+        const lastMessage = chat.lastMessage;
+        const userHasRead = lastMessage?.readBy?.includes(currentUser.uid);
+        const userHasUnread = chat.unreadCounts?.[currentUser.uid] > 0;
+
+        if (lastMessage && !userHasRead) {
             updateDoc(chatRef, {
                 'lastMessage.readBy': arrayUnion(currentUser.uid)
             }).catch(err => console.error("Failed to mark chat as read:", err));
+        }
+
+        if (userHasUnread) {
+            updateDoc(chatRef, {
+                [`unreadCounts.${currentUser.uid}`]: 0
+            }).catch(err => console.error("Failed to reset unread count:", err));
         }
     }, [chat, currentUser, chatRef]);
 

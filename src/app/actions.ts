@@ -25,6 +25,9 @@ import {
   limit,
   updateDoc,
   writeBatch,
+  increment,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { moderateChatMessage } from '@/ai/flows/moderate-chat-message';
@@ -161,6 +164,10 @@ export async function createOrGetChat(currentUserId: string, otherUserId: string
       },
       lastMessage: null,
       createdAt: serverTimestamp(),
+      unreadCounts: {
+        [currentUserId]: 0,
+        [otherUserId]: 0,
+      }
     });
   }
 
@@ -198,17 +205,27 @@ export async function sendMessage(formData: FormData) {
       text,
       senderId,
       createdAt: serverTimestamp() as Timestamp,
+      reactions: {},
+      edited: false,
+      isDeleted: false,
     };
 
     await addDoc(messagesColRef, messageData);
     
-    await updateDoc(chatRef, {
-      lastMessage: {
-        text,
-        createdAt: serverTimestamp(),
-        readBy: [senderId],
-      }
-    });
+    const chatDoc = await getDoc(chatRef);
+    if(chatDoc.exists()) {
+        const otherUserId = chatDoc.data().users.find((uid: string) => uid !== senderId);
+        if (otherUserId) {
+            await updateDoc(chatRef, {
+                lastMessage: {
+                    text,
+                    createdAt: serverTimestamp(),
+                    readBy: [senderId],
+                },
+                [`unreadCounts.${otherUserId}`]: increment(1)
+            });
+        }
+    }
 
     revalidatePath(`/chat/${chatId}`);
     return { success: true };
@@ -279,4 +296,94 @@ export async function updateUserProfile({ displayName, photoURL }: { displayName
     console.error("Error updating profile:", error);
     return { error: 'Failed to update profile: ' + error.message };
   }
+}
+
+export async function reactToMessage(chatId: string, messageId: string, userId: string, emoji: string) {
+    const { firestore: db } = initializeFirebase();
+    const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+
+    try {
+        const messageDoc = await getDoc(messageRef);
+        if (!messageDoc.exists()) {
+            return { error: "Message not found." };
+        }
+        
+        const reactions = messageDoc.data().reactions || {};
+        const fieldPath = `reactions.${userId}`;
+
+        if (reactions[userId] === emoji) {
+            // Un-react: field needs to be deleted, which is complex with dot notation.
+            // It's easier to overwrite the map.
+            delete reactions[userId];
+            await updateDoc(messageRef, { reactions });
+        } else {
+             await updateDoc(messageRef, { [fieldPath]: emoji });
+        }
+
+        revalidatePath(`/chat/${chatId}`);
+        return { success: true };
+
+    } catch (e) {
+        return { error: "Failed to react to message." };
+    }
+}
+
+export async function editMessage(chatId: string, messageId: string, newText: string) {
+    if (newText.trim() === '') return { error: "Message cannot be empty."};
+    
+    const { firestore: db } = initializeFirebase();
+    const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+    
+    try {
+        await updateDoc(messageRef, {
+            text: newText,
+            edited: true,
+        });
+        revalidatePath(`/chat/${chatId}`);
+        return { success: true };
+    } catch(e) {
+        return { error: "Failed to edit message." };
+    }
+}
+
+export async function deleteMessage(chatId: string, messageId: string) {
+    const { firestore: db } = initializeFirebase();
+    const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+
+    try {
+        await updateDoc(messageRef, {
+            text: "This message was deleted.",
+            isDeleted: true,
+            reactions: {} // Clear reactions on delete
+        });
+        revalidatePath(`/chat/${chatId}`);
+        return { success: true };
+    } catch(e) {
+        return { error: "Failed to delete message." };
+    }
+}
+
+export async function togglePinChat(userId: string, chatId: string) {
+    const { firestore: db } = initializeFirebase();
+    const userRef = doc(db, 'users', userId);
+
+    try {
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+            return { error: "User not found." };
+        }
+        
+        const pinnedChats = userDoc.data().pinnedChats || [];
+        if (pinnedChats.includes(chatId)) {
+            await updateDoc(userRef, { pinnedChats: arrayRemove(chatId) });
+        } else {
+            await updateDoc(userRef, { pinnedChats: arrayUnion(chatId) });
+        }
+
+        revalidatePath('/(main)', 'layout');
+        return { success: true };
+
+    } catch (e) {
+        return { error: "Failed to update pin status." };
+    }
 }

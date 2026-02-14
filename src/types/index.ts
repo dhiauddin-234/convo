@@ -7,6 +7,7 @@ export interface AppUser {
   photoURL?: string;
   lastSeen: Timestamp;
   isOnline: boolean;
+  pinnedChats?: string[];
 }
 
 export interface Message {
@@ -15,6 +16,9 @@ export interface Message {
   senderId: string;
   createdAt: Timestamp;
   isModerated?: boolean;
+  reactions?: { [key: string]: string };
+  edited?: boolean;
+  isDeleted?: boolean;
 }
 
 export interface Chat {
@@ -29,4 +33,7 @@ export interface Chat {
     readBy: string[];
   } | null;
   createdAt: Timestamp;
+  unreadCounts: {
+    [key: string]: number;
+  };
 }
