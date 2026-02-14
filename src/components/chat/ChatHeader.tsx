@@ -14,9 +14,10 @@ const { firestore: db } = initializeFirebase();
 
 interface ChatHeaderProps {
     otherUser: AppUser;
+    isTyping: boolean;
 }
 
-export function ChatHeader({ otherUser: initialOtherUser }: ChatHeaderProps) {
+export function ChatHeader({ otherUser: initialOtherUser, isTyping }: ChatHeaderProps) {
     const [otherUser, setOtherUser] = useState(initialOtherUser);
     const { toast } = useToast();
 
@@ -47,10 +48,11 @@ export function ChatHeader({ otherUser: initialOtherUser }: ChatHeaderProps) {
             <UserAvatar user={otherUser} />
             <div className="flex-1">
                 <p className="font-semibold font-headline text-lg">{otherUser.displayName}</p>
-                <p className="text-sm text-muted-foreground">
-                    {otherUser.isOnline ? <span className="text-online">Online</span> : 
-                    (otherUser.lastSeen ? `Last seen ${formatDistanceToNow(otherUser.lastSeen.toDate(), { addSuffix: true })}` : 'Offline')}
-                </p>
+                <div className="text-sm text-muted-foreground h-4">
+                    {isTyping ? <span className="text-primary animate-pulse">typing...</span> :
+                    (otherUser.isOnline ? <span className="text-online">Online</span> : 
+                    (otherUser.lastSeen ? `Last seen ${formatDistanceToNow(otherUser.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'))}
+                </div>
             </div>
         </header>
     );

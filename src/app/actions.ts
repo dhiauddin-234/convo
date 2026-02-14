@@ -32,6 +32,7 @@ import {
 import { revalidatePath } from 'next/cache';
 import { moderateChatMessage } from '@/ai/flows/moderate-chat-message';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import type { Message } from '@/types';
 
 const signUpSchema = z
   .object({
@@ -79,6 +80,9 @@ export async function signUp(prevState: any, formData: FormData) {
       photoURL: randomAvatar.imageUrl,
       lastSeen: serverTimestamp(),
       isOnline: true,
+      pinnedChats: [],
+      mutedChats: [],
+      archivedChats: [],
     });
 
   } catch (error: any) {
@@ -167,6 +171,10 @@ export async function createOrGetChat(currentUserId: string, otherUserId: string
       unreadCounts: {
         [currentUserId]: 0,
         [otherUserId]: 0,
+      },
+      typing: {
+        [currentUserId]: false,
+        [otherUserId]: false,
       }
     });
   }
@@ -179,6 +187,7 @@ const messageSchema = z.object({
   text: z.string().min(1).max(1000),
   chatId: z.string(),
   senderId: z.string(),
+  replyTo: z.string().optional(), // JSON string of the replyTo object
 });
 
 export async function sendMessage(formData: FormData) {
@@ -188,7 +197,10 @@ export async function sendMessage(formData: FormData) {
     return { error: 'Invalid message data' };
   }
   
-  const { text, chatId, senderId } = validatedFields.data;
+  let { text, chatId, senderId, replyTo } = validatedFields.data;
+  
+  const replyToObject = replyTo ? JSON.parse(replyTo) : null;
+
 
   try {
     const moderationResult = await moderateChatMessage({ text });
@@ -201,13 +213,14 @@ export async function sendMessage(formData: FormData) {
     const chatRef = doc(db, 'chats', chatId);
     const messagesColRef = collection(chatRef, 'messages');
     
-    const messageData = {
+    const messageData: Omit<Message, 'id'> = {
       text,
       senderId,
       createdAt: serverTimestamp() as Timestamp,
       reactions: {},
       edited: false,
       isDeleted: false,
+      ...(replyToObject && { replyTo: replyToObject })
     };
 
     await addDoc(messagesColRef, messageData);
@@ -231,6 +244,7 @@ export async function sendMessage(formData: FormData) {
     return { success: true };
 
   } catch (e) {
+    console.error(e)
     return { error: 'Failed to send message.' };
   }
 }
@@ -363,7 +377,7 @@ export async function deleteMessage(chatId: string, messageId: string) {
     }
 }
 
-export async function togglePinChat(userId: string, chatId: string) {
+async function toggleUserArrayField(userId: string, chatId: string, field: 'pinnedChats' | 'mutedChats' | 'archivedChats') {
     const { firestore: db } = initializeFirebase();
     const userRef = doc(db, 'users', userId);
 
@@ -373,17 +387,44 @@ export async function togglePinChat(userId: string, chatId: string) {
             return { error: "User not found." };
         }
         
-        const pinnedChats = userDoc.data().pinnedChats || [];
-        if (pinnedChats.includes(chatId)) {
-            await updateDoc(userRef, { pinnedChats: arrayRemove(chatId) });
+        const array = userDoc.data()[field] || [];
+        if (array.includes(chatId)) {
+            await updateDoc(userRef, { [field]: arrayRemove(chatId) });
         } else {
-            await updateDoc(userRef, { pinnedChats: arrayUnion(chatId) });
+            await updateDoc(userRef, { [field]: arrayUnion(chatId) });
         }
 
         revalidatePath('/(main)', 'layout');
         return { success: true };
 
     } catch (e) {
-        return { error: "Failed to update pin status." };
+        return { error: `Failed to update ${field}.` };
+    }
+}
+
+export async function togglePinChat(userId: string, chatId: string) {
+    return toggleUserArrayField(userId, chatId, 'pinnedChats');
+}
+
+export async function toggleMuteChat(userId: string, chatId: string) {
+    return toggleUserArrayField(userId, chatId, 'mutedChats');
+}
+
+export async function toggleArchiveChat(userId: string, chatId: string) {
+    return toggleUserArrayField(userId, chatId, 'archivedChats');
+}
+
+
+export async function updateTypingStatus(chatId: string, userId: string, isTyping: boolean) {
+    if(!chatId || !userId) return;
+    const { firestore: db } = initializeFirebase();
+    const chatRef = doc(db, 'chats', chatId);
+    try {
+        await updateDoc(chatRef, {
+            [`typing.${userId}`]: isTyping
+        });
+    } catch(e) {
+        // Don't need to show error to user for this
+        console.error("Failed to update typing status:", e);
     }
 }

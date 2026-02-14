@@ -12,6 +12,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { signOut, updateUserPresence } from '@/app/actions';
 import { SidebarChats } from '@/components/chat/SidebarChats';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 function PresenceUpdater() {
   const { user } = useUser();
@@ -21,6 +22,9 @@ function PresenceUpdater() {
       updateUserPresence(user.uid, true);
       
       const handleBeforeUnload = () => {
+        // This might not run reliably, especially on mobile.
+        // Firestore's offline capabilities help, but for real-time presence,
+        // a more robust solution like RTDB's onDisconnect is better.
         updateUserPresence(user.uid, false);
       };
 
@@ -86,9 +90,6 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                     </SidebarMenuItem>
                 </SidebarMenu>
                 <div className="mt-4 px-2 group-data-[collapsed=icon]:hidden">
-                    <h2 className="mb-2 px-2 text-lg font-semibold font-headline tracking-tight">
-                        Recent
-                    </h2>
                     <SidebarChats currentUser={user} />
                 </div>
             </SidebarContent>
@@ -109,6 +110,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                         <DropdownMenuItem asChild>
                             <Link href="/profile"><User className="mr-2 h-4 w-4" />Profile</Link>
                         </DropdownMenuItem>
+                        <ThemeToggle />
                         <DropdownMenuSeparator />
                         <form action={signOut}>
                             <DropdownMenuItem asChild>

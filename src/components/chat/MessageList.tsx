@@ -15,9 +15,10 @@ const { firestore: db } = initializeFirebase();
 interface MessageListProps {
   chatId: string;
   currentUserId: string;
+  onReply: (message: Message) => void;
 }
 
-export function MessageList({ chatId, currentUserId }: MessageListProps) {
+export function MessageList({ chatId, currentUserId, onReply }: MessageListProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -55,7 +56,7 @@ export function MessageList({ chatId, currentUserId }: MessageListProps) {
   }, [chatId, currentUserId, toast]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages]);
 
   if (loading) {
@@ -87,9 +88,17 @@ export function MessageList({ chatId, currentUserId }: MessageListProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-      {messages.map(message => (
-          <ChatMessage key={message.id} message={message} isCurrentUser={message.senderId === currentUserId} currentUserId={currentUserId} chatId={chatId} />
+    <div className="flex-1 overflow-y-auto p-4 space-y-0.5">
+      {messages.map((message, index) => (
+          <ChatMessage 
+              key={message.id} 
+              message={message} 
+              prevMessage={messages[index-1]}
+              isCurrentUser={message.senderId === currentUserId} 
+              currentUserId={currentUserId} 
+              chatId={chatId}
+              onReply={onReply}
+          />
         ))
       }
       <div ref={messagesEndRef} />

@@ -8,17 +8,25 @@ export interface AppUser {
   lastSeen: Timestamp;
   isOnline: boolean;
   pinnedChats?: string[];
+  mutedChats?: string[];
+  archivedChats?: string[];
 }
 
 export interface Message {
   id: string;
   text: string;
   senderId: string;
-  createdAt: Timestamp;
+  createdAt: Timestamp | any; // 'any' for serverTimestamp
   isModerated?: boolean;
   reactions?: { [key: string]: string };
   edited?: boolean;
   isDeleted?: boolean;
+  replyTo?: {
+    messageId: string;
+    senderId: string;
+    textPreview: string;
+    senderDisplayName: string;
+  }
 }
 
 export interface Chat {
@@ -36,4 +44,7 @@ export interface Chat {
   unreadCounts: {
     [key: string]: number;
   };
+  typing?: {
+    [key: string]: boolean;
+  }
 }
