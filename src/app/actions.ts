@@ -206,6 +206,7 @@ export async function sendMessage(formData: FormData) {
       lastMessage: {
         text,
         createdAt: serverTimestamp(),
+        readBy: [senderId],
       }
     });
 

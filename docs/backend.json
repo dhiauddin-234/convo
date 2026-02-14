@@ -96,7 +96,11 @@
             "type": "object",
             "properties": {
                 "text": {"type": "string"},
-                "createdAt": {"type": "string", "format": "date-time"}
+                "createdAt": {"type": "string", "format": "date-time"},
+                "readBy": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
             },
             "description": "The last message sent in the chat room."
         },

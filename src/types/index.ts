@@ -18,7 +18,7 @@ export interface Message {
 }
 
 export interface Chat {
-  id: string;
+  id:string;
   users: string[];
   userDetails: {
     [key: string]: AppUser;
@@ -26,6 +26,7 @@ export interface Chat {
   lastMessage?: {
     text: string;
     createdAt: Timestamp;
+    readBy: string[];
   } | null;
   createdAt: Timestamp;
 }

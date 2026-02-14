@@ -13,6 +13,8 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from 'firebase/auth';
+import { Button } from '../ui/button';
+import { MessageSquarePlus } from 'lucide-react';
 
 const { firestore: db } = initializeFirebase();
 
@@ -60,9 +62,9 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
 
   if (loading) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-2 px-2">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
+          <div key={i} className="flex items-center gap-3 rounded-lg py-1.5">
             <Skeleton className="h-10 w-10 rounded-full" />
             <div className="flex-1 space-y-1">
               <Skeleton className="h-4 w-3/4" />
@@ -75,7 +77,17 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
   }
 
   if (chats.length === 0) {
-      return <p className="p-2 text-sm text-muted-foreground">No recent chats. Find users to start a conversation!</p>
+      return (
+        <div className="p-4 text-center">
+            <p className="text-sm text-muted-foreground mb-4">No recent chats yet.</p>
+            <Button asChild variant="outline" size="sm">
+                <Link href="/users">
+                    <MessageSquarePlus className="mr-2 h-4 w-4" />
+                    Start a Chat
+                </Link>
+            </Button>
+        </div>
+      )
   }
 
   return (
@@ -87,6 +99,8 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
         
         const otherUser = chat.userDetails[otherUserId];
         const isActive = pathname === `/chat/${chat.id}`;
+        const lastMessage = chat.lastMessage;
+        const isUnread = lastMessage && lastMessage.readBy && !lastMessage.readBy.includes(currentUser.uid);
 
         return (
           <Link
@@ -99,16 +113,21 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
           >
             <UserAvatar user={otherUser} className="h-10 w-10" />
             <div className="flex-1 truncate">
-              <p className="font-semibold">{otherUser.displayName}</p>
-              <p className="text-sm truncate">
-                {chat.lastMessage?.text || "No messages yet"}
+              <p className={cn("font-semibold", isUnread && "font-bold text-foreground")}>{otherUser.displayName}</p>
+              <p className={cn("text-sm truncate", isUnread && "text-foreground")}>
+                {lastMessage?.text || "No messages yet"}
               </p>
             </div>
-             {chat.lastMessage?.createdAt && (
-                <div className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(chat.lastMessage.createdAt.toDate(), { addSuffix: true })}
-                </div>
-            )}
+             <div className="flex flex-col items-end gap-1 text-xs">
+                {lastMessage?.createdAt && (
+                    <div className="text-muted-foreground whitespace-nowrap">
+                        {formatDistanceToNow(lastMessage.createdAt.toDate(), { addSuffix: true })}
+                    </div>
+                )}
+                {isUnread && (
+                    <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+                )}
+             </div>
           </Link>
         );
       })}

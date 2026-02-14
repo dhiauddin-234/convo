@@ -8,6 +8,7 @@ import type { Message } from '@/types';
 import { ChatMessage } from './ChatMessage';
 import { Skeleton } from '../ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { MessageSquare } from 'lucide-react';
 
 const { firestore: db } = initializeFirebase();
 
@@ -57,28 +58,40 @@ export function MessageList({ chatId, currentUserId }: MessageListProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {loading ? (
-        <div className="space-y-4">
+  if (loading) {
+      return (
+        <div className="flex-1 p-4 space-y-4">
             <div className="flex items-end gap-2">
                 <Skeleton className="h-8 w-8 rounded-full"/>
                 <Skeleton className="h-10 w-48 rounded-lg"/>
             </div>
             <div className="flex items-end justify-end gap-2">
                 <Skeleton className="h-10 w-32 rounded-lg"/>
-                 <Skeleton className="h-8 w-8 rounded-full"/>
             </div>
              <div className="flex items-end gap-2">
                 <Skeleton className="h-8 w-8 rounded-full"/>
                 <Skeleton className="h-12 w-64 rounded-lg"/>
             </div>
         </div>
-      ) : (
-        messages.map(message => (
+      );
+  }
+
+  if (messages.length === 0) {
+    return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
+            <MessageSquare className="h-12 w-12 text-muted-foreground" />
+            <h3 className="text-xl font-semibold font-headline">No messages yet</h3>
+            <p className="text-muted-foreground">Be the first to say something!</p>
+        </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {messages.map(message => (
           <ChatMessage key={message.id} message={message} isCurrentUser={message.senderId === currentUserId} />
         ))
-      )}
+      }
       <div ref={messagesEndRef} />
     </div>
   );
