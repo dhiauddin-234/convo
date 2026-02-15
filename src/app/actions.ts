@@ -177,6 +177,17 @@ export async function createOrGetChat(currentUserId: string, otherUserId: string
         [otherUserId]: false,
       }
     });
+
+     // Add a system message
+    const messagesColRef = collection(db, 'chats', chatId, 'messages');
+    const systemMessageData = {
+        text: 'Conversation started.',
+        senderId: 'system',
+        createdAt: serverTimestamp(),
+        type: 'system',
+    };
+    await addDoc(messagesColRef, systemMessageData);
+
   }
 
   return chatId;
@@ -217,6 +228,7 @@ export async function sendMessage(formData: FormData) {
       text,
       senderId,
       createdAt: serverTimestamp() as Timestamp,
+      type: 'user',
       reactions: {},
       edited: false,
       isDeleted: false,

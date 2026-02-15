@@ -18,6 +18,7 @@ export interface Message {
   senderId: string;
   createdAt: Timestamp | any; // 'any' for serverTimestamp
   isModerated?: boolean;
+  type?: 'user' | 'system';
   reactions?: { [key: string]: string };
   edited?: boolean;
   isDeleted?: boolean;

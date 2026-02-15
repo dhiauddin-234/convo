@@ -95,12 +95,13 @@ export default function ChatRoomPage() {
     return (
         <div className="flex flex-col h-screen">
             <ChatHeader otherUser={otherUser} isTyping={isTyping} />
-            <MessageList chatId={chatId} currentUserId={currentUserId} onReply={handleReply}/>
+            <MessageList chatId={chatId} currentUserId={currentUserId} onReply={handleReply} participants={chat.userDetails}/>
             <MessageInput 
                 chatId={chatId} 
                 senderId={currentUserId}
                 replyToMessage={replyToMessage}
                 onCancelReply={cancelReply} 
+                participants={chat.userDetails}
             />
         </div>
     );

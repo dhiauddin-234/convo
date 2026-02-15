@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { collection, query, onSnapshot, orderBy, FirestoreError, limit, startAfter, getDocs, QueryDocumentSnapshot } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
-import type { Message } from '@/types';
+import type { Message, AppUser } from '@/types';
 import { ChatMessage } from './ChatMessage';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
@@ -17,9 +17,10 @@ interface MessageListProps {
   chatId: string;
   currentUserId: string;
   onReply: (message: Message) => void;
+  participants: { [key: string]: AppUser };
 }
 
-export function MessageList({ chatId, currentUserId, onReply }: MessageListProps) {
+export function MessageList({ chatId, currentUserId, onReply, participants }: MessageListProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -199,6 +200,7 @@ export function MessageList({ chatId, currentUserId, onReply }: MessageListProps
               currentUserId={currentUserId} 
               chatId={chatId}
               onReply={onReply}
+              participants={participants}
           />
         ))
       }

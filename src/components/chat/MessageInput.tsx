@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send, X } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
-import type { Message } from "@/types";
+import type { Message, AppUser } from "@/types";
 import { useDebouncedCallback } from 'use-debounce';
 
 interface MessageInputProps {
@@ -16,6 +16,7 @@ interface MessageInputProps {
   senderId: string;
   replyToMessage: Message | null;
   onCancelReply: () => void;
+  participants: { [key: string]: AppUser };
 }
 
 function SubmitButton({ disabled }: { disabled?: boolean }) {
@@ -31,7 +32,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 const ReplyPreview = ({ message, onCancel }: { message: Message, onCancel: () => void }) => {
     return (
         <div className="relative rounded-t-lg bg-muted p-2 border-b">
-            <p className="text-xs font-semibold text-primary">Replying to {message.senderId === 'currentUserId' ? 'yourself' : 'them'}</p>
+            <p className="text-xs font-semibold text-primary">Replying to {message.replyTo?.senderDisplayName}</p>
             <p className="text-sm text-muted-foreground truncate">{message.text}</p>
             <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={onCancel}><X className="h-4 w-4"/></Button>
         </div>
@@ -39,7 +40,7 @@ const ReplyPreview = ({ message, onCancel }: { message: Message, onCancel: () =>
 }
 
 
-export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply }: MessageInputProps) {
+export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply, participants }: MessageInputProps) {
     const formRef = useRef<HTMLFormElement>(null);
     const [inputValue, setInputValue] = useState('');
     const { toast } = useToast();
@@ -82,11 +83,12 @@ export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply }
         updateTypingStatus(chatId, senderId, false);
 
         if (replyToMessage) {
+            const senderDisplayName = participants[replyToMessage.senderId]?.displayName || 'Unknown User';
             const replyTo = {
                 messageId: replyToMessage.id,
                 senderId: replyToMessage.senderId,
                 textPreview: replyToMessage.text.substring(0, 100),
-                senderDisplayName: "User", // This should be fetched properly
+                senderDisplayName: senderDisplayName,
             }
             formData.set('replyTo', JSON.stringify(replyTo));
         }

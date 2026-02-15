@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from "@/lib/utils";
-import type { Message } from "@/types";
+import type { AppUser, Message } from "@/types";
 import { format } from 'date-fns';
 import { MoreHorizontal, Smile, Trash2, Edit, X, Reply } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,6 +13,7 @@ import { useState, useTransition, memo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "../ui/badge";
+import { UserAvatar } from "../UserAvatar";
 
 interface ChatMessageProps {
   message: Message;
@@ -21,6 +22,7 @@ interface ChatMessageProps {
   currentUserId: string;
   chatId: string;
   onReply: (message: Message) => void;
+  participants: { [key: string]: AppUser };
 }
 
 const EMOJIS = ['👍', '❤️', '😂', '😮'];
@@ -54,7 +56,7 @@ const ReplyPreview = ({ message, onCancelReply }: { message: Message; onCancelRe
     )
 }
 
-function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUserId, chatId, onReply }: ChatMessageProps) {
+function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUserId, chatId, onReply, participants }: ChatMessageProps) {
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
     const [isEditing, setIsEditing] = useState(false);
@@ -93,8 +95,18 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
         });
     }
 
+    const sender = participants[message.senderId];
     const reactions = message.reactions ? Object.entries(message.reactions) : [];
-    const isConsecutive = prevMessage && prevMessage.senderId === message.senderId && message.createdAt && prevMessage.createdAt && (message.createdAt.toDate().getTime() - prevMessage.createdAt.toDate().getTime()) < 60000 * 3;
+    const isConsecutive = prevMessage && prevMessage.senderId === message.senderId && message.createdAt && prevMessage.createdAt && (message.createdAt.toDate().getTime() - prevMessage.createdAt.toDate().getTime()) < 60000 * 3 && prevMessage.type !== 'system';
+
+    if (message.type === 'system') {
+        return (
+            <div className="text-center text-xs text-muted-foreground my-4 italic">
+                {message.text}
+            </div>
+        )
+    }
+
 
   return (
     <div 
@@ -107,7 +119,7 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
     >
         {!isCurrentUser && (
              <div className="flex-shrink-0 w-8 h-8">
-                {/* {!isConsecutive && <UserAvatar user={...} />}  Avatar would go here */}
+                {(!isConsecutive && sender) && <UserAvatar user={sender} className="w-8 h-8"/>}
              </div>
         )}
 
