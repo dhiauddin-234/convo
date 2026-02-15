@@ -1,4 +1,3 @@
-
 'use client';
 
 import { cn } from "@/lib/utils";
@@ -10,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@/components/ui/button";
 import { reactToMessage, editMessage, deleteMessage } from "@/app/actions";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useTransition } from "react";
+import { useState, useTransition, memo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "../ui/badge";
@@ -30,7 +29,12 @@ const ReplyPreview = ({ message, onCancelReply }: { message: Message; onCancelRe
     
     const scrollToOriginal = () => {
         if(!message.replyTo?.messageId) return;
-        document.getElementById(message.replyTo.messageId)?.scrollIntoView({ behavior: 'smooth' });
+        const originalMessageEl = document.getElementById(message.replyTo.messageId);
+        if (originalMessageEl) {
+             originalMessageEl.scrollIntoView({ behavior: 'smooth' });
+             originalMessageEl.classList.add('animate-pulse', 'bg-accent/50');
+             setTimeout(() => originalMessageEl.classList.remove('animate-pulse', 'bg-accent/50'), 2000);
+        }
     }
 
     return (
@@ -50,7 +54,7 @@ const ReplyPreview = ({ message, onCancelReply }: { message: Message; onCancelRe
     )
 }
 
-export function ChatMessage({ message, prevMessage, isCurrentUser, currentUserId, chatId, onReply }: ChatMessageProps) {
+function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUserId, chatId, onReply }: ChatMessageProps) {
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
     const [isEditing, setIsEditing] = useState(false);
@@ -90,7 +94,7 @@ export function ChatMessage({ message, prevMessage, isCurrentUser, currentUserId
     }
 
     const reactions = message.reactions ? Object.entries(message.reactions) : [];
-    const isConsecutive = prevMessage && prevMessage.senderId === message.senderId && (message.createdAt.toDate().getTime() - prevMessage.createdAt.toDate().getTime()) < 60000 * 3;
+    const isConsecutive = prevMessage && prevMessage.senderId === message.senderId && message.createdAt && prevMessage.createdAt && (message.createdAt.toDate().getTime() - prevMessage.createdAt.toDate().getTime()) < 60000 * 3;
 
   return (
     <div 
@@ -213,3 +217,6 @@ export function ChatMessage({ message, prevMessage, isCurrentUser, currentUserId
     </div>
   );
 }
+
+// Memoize the component to prevent re-renders when props haven't changed.
+export const ChatMessage = memo(ChatMessageComponent);
