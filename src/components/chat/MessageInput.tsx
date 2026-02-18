@@ -10,6 +10,7 @@ import { useRef, useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import type { Message, AppUser } from "@/types";
 import { useDebouncedCallback } from 'use-debounce';
+import { cn } from "@/lib/utils";
 
 interface MessageInputProps {
   chatId: string;
@@ -29,10 +30,11 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
     )
 }
 
-const ReplyPreview = ({ message, onCancel }: { message: Message, onCancel: () => void }) => {
+const ReplyPreview = ({ message, onCancel, participants }: { message: Message, onCancel: () => void, participants: { [key: string]: AppUser } }) => {
+    const sender = participants[message.senderId];
     return (
         <div className="relative rounded-t-lg bg-muted p-2 border-b">
-            <p className="text-xs font-semibold text-primary">Replying to {message.replyTo?.senderDisplayName}</p>
+            <p className="text-xs font-semibold text-primary">Replying to {sender?.displayName || 'User'}</p>
             <p className="text-sm text-muted-foreground truncate">{message.text}</p>
             <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={onCancel}><X className="h-4 w-4"/></Button>
         </div>
@@ -117,7 +119,7 @@ export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply, 
 
   return (
     <div className="border-t p-4 pt-2">
-      {replyToMessage && <ReplyPreview message={replyToMessage} onCancel={onCancelReply}/>}
+      {replyToMessage && <ReplyPreview message={replyToMessage} onCancel={onCancelReply} participants={participants} />}
       <form ref={formRef} action={formAction} className="flex items-center gap-2">
         <Input 
             id="message-input"
