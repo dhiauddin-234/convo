@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, orderBy, FirestoreError, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, FirestoreError, doc, updateDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
 import { useDoc, useMemoFirebase, useFirestore } from '@/firebase';
 import type { AppUser, Chat } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,8 +17,7 @@ import { Button } from '../ui/button';
 import { Archive, ArchiveX, BellOff, MessageSquarePlus, MoreHorizontal, Pin, PinOff, Volume2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import { togglePinChat, toggleMuteChat, toggleArchiveChat } from '@/app/actions';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { TooltipProvider } from '../ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
@@ -28,10 +27,10 @@ interface ChatItemProps {
     isPinned: boolean;
     isMuted: boolean;
     pathname: string;
+    onToggleProperty: (chatId: string, property: 'pinned' | 'muted' | 'archived') => void;
 }
 
-function ChatItem({ chat, currentUser, isPinned, isMuted, pathname }: ChatItemProps) {
-    const { toast } = useToast();
+function ChatItem({ chat, currentUser, isPinned, isMuted, pathname, onToggleProperty }: ChatItemProps) {
     const otherUserId = chat.users.find(uid => uid !== currentUser.uid);
 
     if (!otherUserId || !chat.userDetails[otherUserId]) return null;
@@ -40,18 +39,6 @@ function ChatItem({ chat, currentUser, isPinned, isMuted, pathname }: ChatItemPr
     const isActive = pathname === `/chat/${chat.id}`;
     const lastMessage = chat.lastMessage;
     const unreadCount = chat.unreadCounts?.[currentUser.uid] || 0;
-
-    const handleAction = async (action: 'pin' | 'mute' | 'archive') => {
-        const actionMap = {
-            'pin': togglePinChat,
-            'mute': toggleMuteChat,
-            'archive': toggleArchiveChat
-        };
-        const result = await actionMap[action](currentUser.uid, chat.id);
-        if(result.error) {
-            toast({ variant: 'destructive', title: 'Error', description: result.error });
-        }
-    };
     
     return (
         <TooltipProvider>
@@ -91,15 +78,15 @@ function ChatItem({ chat, currentUser, isPinned, isMuted, pathname }: ChatItemPr
                             <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right">
-                             <DropdownMenuItem onClick={() => handleAction('pin')}>
+                             <DropdownMenuItem onClick={() => onToggleProperty(chat.id, 'pinned')}>
                                 {isPinned ? <PinOff className="mr-2 h-4 w-4"/> : <Pin className="mr-2 h-4 w-4"/>}
                                 {isPinned ? "Unpin" : "Pin"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleAction('mute')}>
+                            <DropdownMenuItem onClick={() => onToggleProperty(chat.id, 'muted')}>
                                 {isMuted ? <Volume2 className="mr-2 h-4 w-4"/> : <BellOff className="mr-2 h-4 w-4"/>}
                                 {isMuted ? "Unmute" : "Mute"}
                             </DropdownMenuItem>
-                             <DropdownMenuItem onClick={() => handleAction('archive')}>
+                             <DropdownMenuItem onClick={() => onToggleProperty(chat.id, 'archived')}>
                                <Archive className="mr-2 h-4 w-4"/> Archive
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -114,6 +101,12 @@ interface SidebarChatsProps {
   currentUser: User | null;
 }
 
+type UserPrefs = {
+    pinned: string[];
+    muted: string[];
+    archived: string[];
+}
+
 export function SidebarChats({ currentUser }: SidebarChatsProps) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,11 +118,18 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
   const userRef = useMemoFirebase(() => (db && currentUser?.uid ? doc(db, 'users', currentUser.uid) : null), [db, currentUser?.uid]);
   const { data: userProfile } = useDoc<AppUser>(userRef);
   
-  const userPrefs = useMemo(() => ({
-      pinned: userProfile?.pinnedChats || [],
-      muted: userProfile?.mutedChats || [],
-      archived: userProfile?.archivedChats || [],
-  }), [userProfile]);
+  const [optimisticPrefs, setOptimisticPrefs] = useState<UserPrefs>({ pinned: [], muted: [], archived: [] });
+
+  useEffect(() => {
+      if (userProfile) {
+          setOptimisticPrefs({
+              pinned: userProfile.pinnedChats || [],
+              muted: userProfile.mutedChats || [],
+              archived: userProfile.archivedChats || [],
+          });
+      }
+  }, [userProfile]);
+
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -162,6 +162,38 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
     return () => unsubscribe();
   }, [currentUser?.uid, toast, db]);
 
+  const handleToggleChatProperty = async (chatId: string, field: 'pinned' | 'muted' | 'archived') => {
+    if (!userRef) return;
+    
+    const fieldMap = {
+        pinned: 'pinnedChats',
+        muted: 'mutedChats',
+        archived: 'archivedChats'
+    };
+    const firestoreField = fieldMap[field];
+
+    const previousPrefs = { ...optimisticPrefs };
+    const currentArray = previousPrefs[field];
+    const isCurrentlySet = currentArray.includes(chatId);
+    
+    const newArray = isCurrentlySet 
+        ? currentArray.filter(id => id !== chatId)
+        : [...currentArray, chatId];
+
+    // Optimistic update
+    setOptimisticPrefs(prev => ({ ...prev, [field]: newArray }));
+
+    try {
+        await updateDoc(userRef, {
+            [firestoreField]: isCurrentlySet ? arrayRemove(chatId) : arrayUnion(chatId)
+        });
+    } catch (error) {
+        // Rollback on error
+        setOptimisticPrefs(previousPrefs);
+        toast({ variant: 'destructive', title: 'Error', description: `Failed to update ${field} status.` });
+    }
+  };
+
 
   const { regularChats, archivedChats } = useMemo(() => {
     const filtered = chats
@@ -173,8 +205,8 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
             return otherUser.displayName.toLowerCase().includes(searchTerm.toLowerCase());
         })
         .sort((a, b) => {
-            const aIsPinned = userPrefs.pinned.includes(a.id);
-            const bIsPinned = userPrefs.pinned.includes(b.id);
+            const aIsPinned = optimisticPrefs.pinned.includes(a.id);
+            const bIsPinned = optimisticPrefs.pinned.includes(b.id);
             if (aIsPinned && !bIsPinned) return -1;
             if (!aIsPinned && bIsPinned) return 1;
             
@@ -184,10 +216,10 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
         });
     
     return {
-        regularChats: filtered.filter(c => !userPrefs.archived.includes(c.id)),
-        archivedChats: filtered.filter(c => userPrefs.archived.includes(c.id)),
+        regularChats: filtered.filter(c => !optimisticPrefs.archived.includes(c.id)),
+        archivedChats: filtered.filter(c => optimisticPrefs.archived.includes(c.id)),
     }
-  }, [chats, searchTerm, currentUser, userPrefs]);
+  }, [chats, searchTerm, currentUser, optimisticPrefs]);
 
 
   if (loading) {
@@ -232,9 +264,10 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
                 key={chat.id} 
                 chat={chat} 
                 currentUser={currentUser!}
-                isPinned={userPrefs.pinned.includes(chat.id)}
-                isMuted={userPrefs.muted.includes(chat.id)}
+                isPinned={optimisticPrefs.pinned.includes(chat.id)}
+                isMuted={optimisticPrefs.muted.includes(chat.id)}
                 pathname={pathname}
+                onToggleProperty={handleToggleChatProperty}
             />
           ))}
         </div>
@@ -256,8 +289,9 @@ export function SidebarChats({ currentUser }: SidebarChatsProps) {
                                 chat={chat} 
                                 currentUser={currentUser!}
                                 isPinned={false} // Archived chats cannot be pinned
-                                isMuted={userPrefs.muted.includes(chat.id)}
+                                isMuted={optimisticPrefs.muted.includes(chat.id)}
                                 pathname={pathname}
+                                onToggleProperty={handleToggleChatProperty}
                             />
                         ))}
                     </div>

@@ -346,7 +346,6 @@ export async function reactToMessage(chatId: string, messageId: string, userId: 
              await updateDoc(messageRef, { [fieldPath]: emoji });
         }
 
-        revalidatePath(`/chat/${chatId}`);
         return { success: true };
 
     } catch (e) {
@@ -365,7 +364,6 @@ export async function editMessage(chatId: string, messageId: string, newText: st
             text: newText,
             edited: true,
         });
-        revalidatePath(`/chat/${chatId}`);
         return { success: true };
     } catch(e) {
         return { error: "Failed to edit message." };
@@ -382,7 +380,6 @@ export async function deleteMessage(chatId: string, messageId: string) {
             isDeleted: true,
             reactions: {} // Clear reactions on delete
         });
-        revalidatePath(`/chat/${chatId}`);
         return { success: true };
     } catch(e) {
         return { error: "Failed to delete message." };
@@ -406,7 +403,6 @@ async function toggleUserArrayField(userId: string, chatId: string, field: 'pinn
             await updateDoc(userRef, { [field]: arrayUnion(chatId) });
         }
 
-        revalidatePath('/(main)', 'layout');
         return { success: true };
 
     } catch (e) {

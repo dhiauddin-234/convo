@@ -7,13 +7,14 @@ import { MoreHorizontal, Smile, Trash2, Edit, X, Reply } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { reactToMessage, editMessage, deleteMessage } from "@/app/actions";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useTransition, memo } from "react";
+import { useState, useEffect, memo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "../ui/badge";
 import { UserAvatar } from "../UserAvatar";
+import { useFirestore } from "@/firebase";
+import { doc, updateDoc, deleteField } from "firebase/firestore";
 
 interface ChatMessageProps {
   message: Message;
@@ -58,59 +59,100 @@ const ReplyPreview = ({ message, onCancelReply }: { message: Message; onCancelRe
 
 function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUserId, chatId, onReply, participants }: ChatMessageProps) {
     const { toast } = useToast();
-    const [isPending, startTransition] = useTransition();
+    const db = useFirestore();
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.text);
 
-    const handleReaction = (emoji: string) => {
-        startTransition(async () => {
-            const result = await reactToMessage(chatId, message.id, currentUserId, emoji);
-            if(result?.error) {
-                toast({ variant: 'destructive', title: 'Error', description: result.error });
-            }
-        });
-    }
+    // Optimistic state for the message
+    const [optimisticMessage, setOptimisticMessage] = useState(message);
+    useEffect(() => {
+        setOptimisticMessage(message);
+    }, [message]);
 
-    const handleSaveEdit = () => {
-        if (editText.trim() === '' || editText === message.text) {
+    const messageRef = doc(db, 'chats', chatId, 'messages', message.id);
+
+    const handleReaction = async (emoji: string) => {
+        const currentReactions = optimisticMessage.reactions || {};
+        const previousReactions = { ...currentReactions };
+        const userHasReactedWithEmoji = currentReactions[currentUserId] === emoji;
+
+        let newReactions = { ...currentReactions };
+        if (userHasReactedWithEmoji) {
+            delete newReactions[currentUserId];
+        } else {
+            newReactions[currentUserId] = emoji;
+        }
+        
+        setOptimisticMessage(prev => ({ ...prev, reactions: newReactions }));
+
+        try {
+            if (userHasReactedWithEmoji) {
+                await updateDoc(messageRef, { [`reactions.${currentUserId}`]: deleteField() });
+            } else {
+                await updateDoc(messageRef, { [`reactions.${currentUserId}`]: emoji });
+            }
+        } catch (error) {
+            setOptimisticMessage(prev => ({ ...prev, reactions: previousReactions }));
+            toast({ variant: 'destructive', title: 'Error', description: "Failed to apply reaction." });
+        }
+    };
+
+    const handleSaveEdit = async () => {
+        const previousText = message.text; // Use original prop for rollback
+        if (editText.trim() === '' || editText === previousText) {
             setIsEditing(false);
             return;
         }
-        startTransition(async () => {
-            const result = await editMessage(chatId, message.id, editText);
-            if(result?.error) {
-                toast({ variant: 'destructive', title: 'Error', description: result.error });
-            } else {
-                setIsEditing(false);
-            }
-        });
-    }
 
-    const handleDelete = () => {
-        startTransition(async () => {
-            const result = await deleteMessage(chatId, message.id);
-            if(result?.error) {
-                toast({ variant: 'destructive', title: 'Error', description: result.error });
-            }
-        });
-    }
+        setOptimisticMessage(prev => ({...prev, text: editText, edited: true}));
+        setIsEditing(false);
 
-    const sender = participants[message.senderId];
-    const reactions = message.reactions ? Object.entries(message.reactions) : [];
-    const isConsecutive = prevMessage && prevMessage.senderId === message.senderId && message.createdAt && prevMessage.createdAt && (message.createdAt.toDate().getTime() - prevMessage.createdAt.toDate().getTime()) < 60000 * 3 && prevMessage.type !== 'system';
+        try {
+            await updateDoc(messageRef, { text: editText, edited: true });
+        } catch (error) {
+            setOptimisticMessage(prev => ({...prev, text: previousText, edited: message.edited}));
+            toast({ variant: 'destructive', title: 'Error', description: "Failed to edit message." });
+        }
+    };
 
-    if (message.type === 'system') {
+    const handleDelete = async () => {
+        const previousMessageState = { ...optimisticMessage };
+        const deletedState = {
+            ...optimisticMessage,
+            text: "This message was deleted.",
+            isDeleted: true,
+            reactions: {}
+        };
+        
+        setOptimisticMessage(deletedState);
+
+        try {
+            await updateDoc(messageRef, {
+                text: "This message was deleted.",
+                isDeleted: true,
+                reactions: {}
+            });
+        } catch (error) {
+            setOptimisticMessage(previousMessageState);
+            toast({ variant: 'destructive', title: 'Error', description: "Failed to delete message." });
+        }
+    };
+
+    const sender = participants[optimisticMessage.senderId];
+    const reactions = optimisticMessage.reactions ? Object.entries(optimisticMessage.reactions) : [];
+    const isConsecutive = prevMessage && prevMessage.senderId === optimisticMessage.senderId && optimisticMessage.createdAt && prevMessage.createdAt && (optimisticMessage.createdAt.toDate().getTime() - prevMessage.createdAt.toDate().getTime()) < 60000 * 3 && prevMessage.type !== 'system';
+
+    if (optimisticMessage.type === 'system') {
         return (
             <div className="text-center text-xs text-muted-foreground my-4 italic">
-                {message.text}
+                {optimisticMessage.text}
             </div>
         )
     }
 
-
   return (
     <div 
-        id={message.id}
+        id={optimisticMessage.id}
         className={cn(
             "group flex w-full items-start gap-3", 
             isCurrentUser ? "justify-end" : "justify-start",
@@ -125,12 +167,12 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
 
         <div className={cn("flex items-center gap-1", isCurrentUser && "flex-row-reverse")}>
             <div className={cn("opacity-0 transition-opacity group-hover:opacity-100", isEditing && "opacity-0")}>
-                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onReply(message)} disabled={message.isDeleted}>
+                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onReply(optimisticMessage)} disabled={optimisticMessage.isDeleted}>
                     <Reply className="h-4 w-4"/>
                 </Button>
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" disabled={message.isDeleted}><Smile className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" disabled={optimisticMessage.isDeleted}><Smile className="h-4 w-4"/></Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-1">
                         <div className="flex gap-1">
@@ -143,13 +185,13 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
                     </PopoverContent>
                 </Popover>
 
-                {isCurrentUser && !message.isDeleted && (
+                {isCurrentUser && !optimisticMessage.isDeleted && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => { setIsEditing(true); setEditText(message.text) }}>
+                            <DropdownMenuItem onClick={() => { setIsEditing(true); setEditText(optimisticMessage.text) }}>
                                 <Edit className="mr-2 h-4 w-4"/> Edit
                             </DropdownMenuItem>
                              <AlertDialog>
@@ -182,27 +224,27 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
                 isCurrentUser
                     ? "bg-primary text-primary-foreground"
                     : "bg-card",
-                message.isDeleted && "bg-transparent italic text-muted-foreground border"
+                optimisticMessage.isDeleted && "bg-transparent italic text-muted-foreground border"
                 )}
             >
-                {message.replyTo && <ReplyPreview message={message} />}
+                {optimisticMessage.replyTo && <ReplyPreview message={optimisticMessage} />}
                 {isEditing ? (
                     <div className="space-y-2">
                         <Textarea value={editText} onChange={e => setEditText(e.target.value)} className="text-sm bg-background text-foreground" autoFocus onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) {e.preventDefault(); handleSaveEdit();} if (e.key === 'Escape') setIsEditing(false) }}/>
                         <div className="flex justify-end gap-2">
                             <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
-                            <Button size="sm" onClick={handleSaveEdit} disabled={isPending}>Save</Button>
+                            <Button size="sm" onClick={handleSaveEdit}>Save</Button>
                         </div>
                     </div>
                 ) : (
                     <>
-                        <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                        <p className="text-sm whitespace-pre-wrap">{optimisticMessage.text}</p>
                         <div className={cn(
                             "mt-1 flex items-center gap-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity", 
                             isCurrentUser ? "text-primary-foreground/70" : "text-muted-foreground"
                         )}>
-                            {message.createdAt ? format(message.createdAt.toDate(), 'p') : ''}
-                            {message.edited && !message.isDeleted && (
+                            {optimisticMessage.createdAt ? format(optimisticMessage.createdAt.toDate(), 'p') : ''}
+                            {optimisticMessage.edited && !optimisticMessage.isDeleted && (
                                 <span>(edited)</span>
                             )}
                         </div>
