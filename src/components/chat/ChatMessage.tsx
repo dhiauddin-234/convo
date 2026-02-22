@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import type { AppUser, Message } from "@/types";
 import { format } from 'date-fns';
-import { MoreHorizontal, Smile, Trash2, Edit, X, Reply } from "lucide-react";
+import { MoreHorizontal, Smile, Trash2, Edit, X, Reply, Copy } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -138,13 +138,21 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
         }
     };
 
+    const handleCopy = () => {
+        if (optimisticMessage.isDeleted) return;
+        navigator.clipboard.writeText(optimisticMessage.text);
+        toast({
+            title: "Copied to clipboard",
+        });
+    };
+
     const sender = participants[optimisticMessage.senderId];
     const reactions = optimisticMessage.reactions ? Object.entries(optimisticMessage.reactions) : [];
     const isConsecutive = prevMessage && prevMessage.senderId === optimisticMessage.senderId && optimisticMessage.createdAt && prevMessage.createdAt && (optimisticMessage.createdAt.toDate().getTime() - prevMessage.createdAt.toDate().getTime()) < 60000 * 3 && prevMessage.type !== 'system';
 
     if (optimisticMessage.type === 'system') {
         return (
-            <div className="text-center text-xs text-muted-foreground my-4 italic">
+            <div className="text-center text-xs text-muted-foreground my-4 italic animate-fade-in">
                 {optimisticMessage.text}
             </div>
         )
@@ -154,7 +162,7 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
     <div 
         id={optimisticMessage.id}
         className={cn(
-            "group flex w-full items-start gap-3", 
+            "group flex w-full items-start gap-3 animate-fade-in", 
             isCurrentUser ? "justify-end" : "justify-start",
             isConsecutive ? 'mt-1' : 'mt-4'
         )}
@@ -167,9 +175,6 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
 
         <div className={cn("flex items-center gap-1", isCurrentUser && "flex-row-reverse")}>
             <div className={cn("opacity-0 transition-opacity group-hover:opacity-100", isEditing && "opacity-0")}>
-                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onReply(optimisticMessage)} disabled={optimisticMessage.isDeleted}>
-                    <Reply className="h-4 w-4"/>
-                </Button>
                 <Popover>
                     <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-7 w-7" disabled={optimisticMessage.isDeleted}><Smile className="h-4 w-4"/></Button>
@@ -185,37 +190,46 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
                     </PopoverContent>
                 </Popover>
 
-                {isCurrentUser && !optimisticMessage.isDeleted && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4"/></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => { setIsEditing(true); setEditText(optimisticMessage.text) }}>
-                                <Edit className="mr-2 h-4 w-4"/> Edit
-                            </DropdownMenuItem>
-                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
-                                        <Trash2 className="mr-2 h-4 w-4"/> Delete
-                                    </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This action cannot be undone. This will permanently delete your message.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onReply(optimisticMessage)} disabled={optimisticMessage.isDeleted}>
+                    <Reply className="h-4 w-4"/>
+                </Button>
+
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4"/></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={handleCopy} disabled={optimisticMessage.isDeleted}>
+                            <Copy className="mr-2 h-4 w-4"/> Copy Text
+                        </DropdownMenuItem>
+                        {isCurrentUser && !optimisticMessage.isDeleted && (
+                            <>
+                                <DropdownMenuItem onClick={() => { setIsEditing(true); setEditText(optimisticMessage.text) }}>
+                                    <Edit className="mr-2 h-4 w-4"/> Edit
+                                </DropdownMenuItem>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                                            <Trash2 className="mr-2 h-4 w-4"/> Delete
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action cannot be undone. This will permanently delete your message.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             <div

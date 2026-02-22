@@ -8,7 +8,7 @@ import { ChatMessage } from './ChatMessage';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, MessageSquare } from 'lucide-react';
+import { Loader2, MessageSquare, ChevronDown } from 'lucide-react';
 
 const { firestore: db } = initializeFirebase();
 const MESSAGES_PER_PAGE = 25;
@@ -26,11 +26,16 @@ export function MessageList({ chatId, currentUserId, onReply, participants }: Me
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const topLoaderRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const scrollToBottom = useCallback((behavior: 'smooth' | 'auto' = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
 
   // Initial messages listener
   useEffect(() => {
@@ -136,17 +141,40 @@ export function MessageList({ chatId, currentUserId, onReply, participants }: Me
   }, [loadMoreMessages]);
 
 
-  // Scroll to bottom only on initial load or new message sent by current user
+  // Scroll to bottom only on new message or if user is near bottom
   const prevMessagesLength = useRef(messages.length);
   useEffect(() => {
-    const isNewMessageFromSelf = messages.length > prevMessagesLength.current && messages[messages.length - 1]?.senderId === currentUserId;
-    const isInitialLoad = prevMessagesLength.current === 0 && messages.length > 0;
+    const container = chatContainerRef.current;
+    if (!container) return;
 
-    if (isNewMessageFromSelf || isInitialLoad) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 300;
+    const isNewMessage = messages.length > prevMessagesLength.current;
+    const isInitialLoad = prevMessagesLength.current === 0 && messages.length > 0;
+    
+    if (isInitialLoad) {
+        scrollToBottom('auto');
+    } else if (isNewMessage && isNearBottom) {
+        scrollToBottom('smooth');
     }
+
     prevMessagesLength.current = messages.length;
-  }, [messages, currentUserId]);
+  }, [messages, currentUserId, scrollToBottom]);
+
+  // Listener for showing jump-to-latest button
+  const handleScroll = useCallback(() => {
+    const container = chatContainerRef.current;
+    if (container) {
+      const isScrolledUp = container.scrollHeight - container.scrollTop > container.clientHeight + 200;
+      setShowJumpToLatest(isScrolledUp);
+    }
+  }, []);
+
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    container?.addEventListener('scroll', handleScroll);
+    return () => container?.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
 
   if (loadingInitial) {
       return (
@@ -177,7 +205,7 @@ export function MessageList({ chatId, currentUserId, onReply, participants }: Me
   }
 
   return (
-    <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4">
+    <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 relative">
        <div ref={topLoaderRef} className="h-1 w-full">
             {loadingMore && (
                 <div className="flex justify-center my-4">
@@ -205,6 +233,16 @@ export function MessageList({ chatId, currentUserId, onReply, participants }: Me
         ))
       }
       </div>
+      {showJumpToLatest && (
+        <Button
+            onClick={() => scrollToBottom('smooth')}
+            size="icon"
+            className="absolute bottom-4 right-4 z-10 rounded-full h-10 w-10 animate-fade-in shadow-lg"
+        >
+            <ChevronDown className="h-5 w-5" />
+            <span className="sr-only">Jump to latest</span>
+        </Button>
+      )}
       <div ref={messagesEndRef} />
     </div>
   );
