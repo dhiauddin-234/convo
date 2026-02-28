@@ -1,4 +1,3 @@
-
 'use client';
 
 import { sendMessage, updateTypingStatus } from "@/app/actions";
@@ -23,7 +22,7 @@ interface MessageInputProps {
 function SubmitButton({ disabled }: { disabled?: boolean }) {
     const { pending } = useFormStatus();
     return (
-        <Button type="submit" size="icon" disabled={pending || disabled}>
+        <Button type="submit" size="icon" disabled={pending || disabled} className="h-10 w-10 sm:h-10 sm:w-10">
             {pending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4" />}
             <span className="sr-only">Send Message</span>
         </Button>
@@ -34,8 +33,8 @@ const ReplyPreview = ({ message, onCancel, participants }: { message: Message, o
     const sender = participants[message.senderId];
     return (
         <div className="relative rounded-t-lg bg-muted p-2 border-b">
-            <p className="text-xs font-semibold text-primary">Replying to {sender?.displayName || 'User'}</p>
-            <p className="text-sm text-muted-foreground truncate">{message.text}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-primary">Replying to {sender?.displayName || 'User'}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{message.text}</p>
             <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={onCancel}><X className="h-4 w-4"/></Button>
         </div>
     )
@@ -77,8 +76,9 @@ export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply, 
     };
 
     async function formAction(formData: FormData) {
-        // Optimistically clear input
         const currentInput = inputValue;
+        if (!currentInput.trim()) return;
+
         setInputValue(''); 
         onCancelReply();
         localStorage.removeItem(`draft_${chatId}`);
@@ -103,7 +103,7 @@ export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply, 
                 title: 'Message Error',
                 description: result.error,
             });
-            setInputValue(currentInput); // Restore on error
+            setInputValue(currentInput); 
             localStorage.setItem(`draft_${chatId}`, currentInput);
         }
     }
@@ -118,7 +118,7 @@ export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply, 
     };
 
   return (
-    <div className="border-t p-4 pt-2">
+    <div className="border-t p-3 sm:p-4 pt-2 bg-background sticky bottom-0 z-10">
       {replyToMessage && <ReplyPreview message={replyToMessage} onCancel={onCancelReply} participants={participants} />}
       <form ref={formRef} action={formAction} className="flex items-center gap-2">
         <Input 
@@ -130,7 +130,10 @@ export function MessageInput({ chatId, senderId, replyToMessage, onCancelReply, 
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            className={cn(replyToMessage && "rounded-t-none border-t-0 focus-visible:ring-offset-0")}
+            className={cn(
+                "h-10 sm:h-10 text-base sm:text-sm", 
+                replyToMessage && "rounded-t-none border-t-0 focus-visible:ring-offset-0"
+            )}
         />
         <input type="hidden" name="chatId" value={chatId} />
         <input type="hidden" name="senderId" value={senderId} />

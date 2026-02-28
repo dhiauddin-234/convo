@@ -92,25 +92,30 @@ export function ProfileForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <Card>
-        <CardHeader>
+    <form onSubmit={handleSubmit} className="w-full">
+      <Card className="border-0 sm:border shadow-none sm:shadow-sm">
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle>Edit Profile</CardTitle>
           <CardDescription>Update your public profile information.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20">
+        <CardContent className="space-y-6 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+            <Avatar className="h-24 w-24 sm:h-20 sm:w-20">
               <AvatarImage src={avatarPreview} />
-              <AvatarFallback>
+              <AvatarFallback className="text-xl">
                 {displayName?.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div className="grid gap-2">
-                <Label htmlFor="avatar-upload">Profile Picture</Label>
-                <div className="flex items-center gap-2">
+            <div className="grid gap-2 w-full text-center sm:text-left">
+                <Label htmlFor="avatar-upload" className="text-base sm:text-sm">Profile Picture</Label>
+                <div className="flex flex-col sm:flex-row items-center gap-2">
                     <Input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden"/>
-                    <Button type="button" variant="outline" onClick={() => document.getElementById('avatar-upload')?.click()}>
+                    <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full sm:w-auto h-11 sm:h-9"
+                        onClick={() => document.getElementById('avatar-upload')?.click()}
+                    >
                         <Upload className="mr-2 h-4 w-4"/>
                         {avatarFile ? "Change photo" : "Upload photo"}
                     </Button>
@@ -120,23 +125,24 @@ export function ProfileForm() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="displayName">Display Name</Label>
+            <Label htmlFor="displayName" className="text-base sm:text-sm">Display Name</Label>
             <Input
               id="displayName"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
               minLength={3}
+              className="h-11 sm:h-10 text-base sm:text-sm"
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" value={user?.email ?? ''} disabled />
+            <Label htmlFor="email" className="text-base sm:text-sm">Email</Label>
+            <Input id="email" value={user?.email ?? ''} disabled className="h-11 sm:h-10 text-base sm:text-sm bg-muted/50" />
              <p className="text-xs text-muted-foreground">Email address cannot be changed.</p>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={isPending}>
+        <CardFooter className="px-4 sm:px-6">
+          <Button type="submit" disabled={isPending} className="w-full sm:w-auto h-11 sm:h-10">
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Changes
           </Button>

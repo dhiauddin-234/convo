@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,6 +19,7 @@ import { Badge } from '../ui/badge';
 import { TooltipProvider } from '../ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
+import { useSidebar } from '@/components/ui/sidebar';
 
 interface ChatItemProps {
     chat: Chat;
@@ -31,6 +31,7 @@ interface ChatItemProps {
 }
 
 function ChatItem({ chat, currentUser, isPinned, isMuted, pathname, onToggleProperty }: ChatItemProps) {
+    const { setOpenMobile } = useSidebar();
     const otherUserId = chat.users.find(uid => uid !== currentUser.uid);
 
     if (!otherUserId || !chat.userDetails[otherUserId]) return null;
@@ -45,8 +46,9 @@ function ChatItem({ chat, currentUser, isPinned, isMuted, pathname, onToggleProp
              <div className="relative group/chat-item">
                 <Link
                     href={`/chat/${chat.id}`}
+                    onClick={() => setOpenMobile(false)}
                     className={cn(
-                    "flex items-center gap-3 rounded-lg px-2 py-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground",
+                    "flex items-center gap-3 rounded-lg px-2 py-2.5 sm:py-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground",
                     isActive && "bg-accent text-accent-foreground"
                     )}
                 >
@@ -67,7 +69,7 @@ function ChatItem({ chat, currentUser, isPinned, isMuted, pathname, onToggleProp
                             </div>
                         )}
                         {(unreadCount > 0 && !isMuted) && (
-                            <Badge className="h-5 min-w-[1.25rem] justify-center rounded-full p-1 text-xs">{unreadCount}</Badge>
+                            <Badge className="h-5 min-w-[1.25rem] justify-center rounded-full p-1 text-[10px]">{unreadCount}</Badge>
                         )}
                         {isMuted && <BellOff className="h-4 w-4 text-muted-foreground" />}
                     </div>
@@ -75,7 +77,7 @@ function ChatItem({ chat, currentUser, isPinned, isMuted, pathname, onToggleProp
                 <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/chat-item:opacity-100 group-data-[collapsed=icon]:hidden">
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4"/></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right">
                              <DropdownMenuItem onClick={() => onToggleProperty(chat.id, 'pinned')}>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { UserAvatar } from "@/components/UserAvatar";
@@ -43,12 +42,12 @@ export function ChatHeader({ otherUser: initialOtherUser, isTyping }: ChatHeader
     }, [initialOtherUser.uid, toast]);
 
     return (
-        <header className="flex items-center gap-4 border-b p-4">
+        <header className="flex items-center gap-2 sm:gap-4 border-b p-3 sm:p-4 bg-background sticky top-0 z-10 h-16 sm:h-auto">
             <SidebarTrigger className="md:hidden"/>
-            <UserAvatar user={otherUser} />
-            <div className="flex-1">
-                <p className="font-semibold font-headline text-lg">{otherUser.displayName}</p>
-                <div className="text-sm text-muted-foreground h-4">
+            <UserAvatar user={otherUser} className="h-8 w-8 sm:h-10 sm:w-10" />
+            <div className="flex-1 min-w-0">
+                <p className="font-semibold font-headline text-base sm:text-lg truncate">{otherUser.displayName}</p>
+                <div className="text-[10px] sm:text-xs text-muted-foreground h-4 truncate">
                     {isTyping ? <span className="text-primary animate-pulse">typing...</span> :
                     (otherUser.isOnline ? <span className="text-online">Online</span> : 
                     (otherUser.lastSeen ? `Last seen ${formatDistanceToNow(otherUser.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'))}

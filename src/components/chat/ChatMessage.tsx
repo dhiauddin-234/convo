@@ -162,7 +162,7 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
     <div 
         id={optimisticMessage.id}
         className={cn(
-            "group flex w-full items-start gap-3 animate-fade-in", 
+            "group flex w-full items-start gap-2 sm:gap-3 animate-fade-in", 
             isCurrentUser ? "justify-end" : "justify-start",
             isConsecutive ? 'mt-1' : 'mt-4'
         )}
@@ -174,15 +174,19 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
         )}
 
         <div className={cn("flex items-center gap-1", isCurrentUser && "flex-row-reverse")}>
-            <div className={cn("opacity-0 transition-opacity group-hover:opacity-100", isEditing && "opacity-0")}>
+            {/* On mobile, we show actions by default or make them easily accessible. 
+                Using md:opacity-0 to keep desktop hover behavior while ensuring mobile visibility. */}
+            <div className={cn("flex opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100", isEditing && "opacity-0")}>
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" disabled={optimisticMessage.isDeleted}><Smile className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-7 sm:w-7" disabled={optimisticMessage.isDeleted}>
+                            <Smile className="h-4 w-4"/>
+                        </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-1">
+                    <PopoverContent className="w-auto p-1" side="top">
                         <div className="flex gap-1">
                             {EMOJIS.map(emoji => (
-                                <Button key={emoji} variant="ghost" size="icon" className="h-8 w-8 text-xl" onClick={() => handleReaction(emoji)}>
+                                <Button key={emoji} variant="ghost" size="icon" className="h-10 w-10 sm:h-8 sm:w-8 text-xl" onClick={() => handleReaction(emoji)}>
                                     {emoji}
                                 </Button>
                             ))}
@@ -190,15 +194,17 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
                     </PopoverContent>
                 </Popover>
 
-                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onReply(optimisticMessage)} disabled={optimisticMessage.isDeleted}>
+                 <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-7 sm:w-7" onClick={() => onReply(optimisticMessage)} disabled={optimisticMessage.isDeleted}>
                     <Reply className="h-4 w-4"/>
                 </Button>
 
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-7 sm:w-7">
+                            <MoreHorizontal className="h-4 w-4"/>
+                        </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent>
+                    <DropdownMenuContent align={isCurrentUser ? "end" : "start"}>
                         <DropdownMenuItem onClick={handleCopy} disabled={optimisticMessage.isDeleted}>
                             <Copy className="mr-2 h-4 w-4"/> Copy Text
                         </DropdownMenuItem>
@@ -234,7 +240,7 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
 
             <div
                 className={cn(
-                "relative max-w-xs rounded-lg px-3 py-2 md:max-w-md lg:max-w-lg",
+                "relative max-w-[75%] sm:max-w-xs rounded-lg px-3 py-2 md:max-w-md lg:max-w-lg",
                 isCurrentUser
                     ? "bg-primary text-primary-foreground"
                     : "bg-card",
@@ -243,8 +249,20 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
             >
                 {optimisticMessage.replyTo && <ReplyPreview message={optimisticMessage} />}
                 {isEditing ? (
-                    <div className="space-y-2">
-                        <Textarea value={editText} onChange={e => setEditText(e.target.value)} className="text-sm bg-background text-foreground" autoFocus onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) {e.preventDefault(); handleSaveEdit();} if (e.key === 'Escape') setIsEditing(false) }}/>
+                    <div className="space-y-2 min-w-[200px]">
+                        <Textarea 
+                            value={editText} 
+                            onChange={e => setEditText(e.target.value)} 
+                            className="text-sm bg-background text-foreground" 
+                            autoFocus 
+                            onKeyDown={e => { 
+                                if(e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault(); 
+                                    handleSaveEdit();
+                                } 
+                                if (e.key === 'Escape') setIsEditing(false) 
+                            }}
+                        />
                         <div className="flex justify-end gap-2">
                             <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
                             <Button size="sm" onClick={handleSaveEdit}>Save</Button>
@@ -252,10 +270,10 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
                     </div>
                 ) : (
                     <>
-                        <p className="text-sm whitespace-pre-wrap">{optimisticMessage.text}</p>
+                        <p className="text-sm whitespace-pre-wrap break-words">{optimisticMessage.text}</p>
                         <div className={cn(
-                            "mt-1 flex items-center gap-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity", 
-                            isCurrentUser ? "text-primary-foreground/70" : "text-muted-foreground"
+                            "mt-1 flex items-center gap-2 text-[10px] opacity-70 md:opacity-0 md:group-hover:opacity-100 transition-opacity", 
+                            isCurrentUser ? "text-primary-foreground/70 justify-end" : "text-muted-foreground"
                         )}>
                             {optimisticMessage.createdAt ? format(optimisticMessage.createdAt.toDate(), 'p') : ''}
                             {optimisticMessage.edited && !optimisticMessage.isDeleted && (
@@ -266,12 +284,12 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
                 )}
 
                  {reactions.length > 0 && !isEditing && (
-                    <div className="absolute -bottom-4 flex gap-0.5 rounded-full bg-card border px-1 py-0.5"
-                         style={isCurrentUser ? { right: '10px' } : { left: '10px' }}>
+                    <div className="absolute -bottom-4 flex gap-0.5 rounded-full bg-card border px-1 py-0.5 shadow-sm"
+                         style={isCurrentUser ? { right: '4px' } : { left: '4px' }}>
                         {EMOJIS.map(emoji => {
                             const count = reactions.filter(([, e]) => e === emoji).length;
                             if (count === 0) return null;
-                            return <Badge key={emoji} variant="secondary" className="h-5 px-1.5">{emoji} {count > 1 && <span className="text-xs ml-1">{count}</span>}</Badge>
+                            return <Badge key={emoji} variant="secondary" className="h-5 px-1.5 flex items-center justify-center">{emoji} {count > 1 && <span className="text-[10px] ml-1">{count}</span>}</Badge>
                         })}
                     </div>
                 )}
@@ -279,12 +297,11 @@ function ChatMessageComponent({ message, prevMessage, isCurrentUser, currentUser
         </div>
 
         {isCurrentUser && (
-            <div className="flex-shrink-0 w-8 h-8"/> // Placeholder for avatar alignment
+            <div className="flex-shrink-0 w-8 h-8"/> 
         )}
 
     </div>
   );
 }
 
-// Memoize the component to prevent re-renders when props haven't changed.
 export const ChatMessage = memo(ChatMessageComponent);
