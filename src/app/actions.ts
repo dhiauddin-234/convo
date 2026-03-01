@@ -1,4 +1,3 @@
-
 'use server';
 
 import { z } from 'zod';
@@ -21,8 +20,6 @@ import {
   query,
   where,
   Timestamp,
-  orderBy,
-  limit,
   updateDoc,
   writeBatch,
   increment,
@@ -129,16 +126,9 @@ export async function login(prevState: any, formData: FormData) {
 }
 
 export async function signOut() {
-  const { auth, firestore: db } = initializeFirebase();
+  const { auth } = initializeFirebase();
   if (!auth) {
     throw new Error("Authentication service is not initialized.");
-  }
-  const uid = auth.currentUser?.uid;
-  if(uid) {
-    await updateDoc(doc(db, 'users', uid), {
-      isOnline: false,
-      lastSeen: serverTimestamp(),
-    });
   }
   await firebaseSignOut(auth);
   redirect('/login');
@@ -178,7 +168,6 @@ export async function createOrGetChat(currentUserId: string, otherUserId: string
       }
     });
 
-     // Add a system message
     const messagesColRef = collection(db, 'chats', chatId, 'messages');
     const systemMessageData = {
         text: 'Conversation started.',
@@ -187,18 +176,16 @@ export async function createOrGetChat(currentUserId: string, otherUserId: string
         type: 'system',
     };
     await addDoc(messagesColRef, systemMessageData);
-
   }
 
   return chatId;
 }
 
-
 const messageSchema = z.object({
   text: z.string().min(1).max(1000),
   chatId: z.string(),
   senderId: z.string(),
-  replyTo: z.string().optional(), // JSON string of the replyTo object
+  replyTo: z.string().optional(),
 });
 
 export async function sendMessage(formData: FormData) {
@@ -209,9 +196,7 @@ export async function sendMessage(formData: FormData) {
   }
   
   let { text, chatId, senderId, replyTo } = validatedFields.data;
-  
   const replyToObject = replyTo ? JSON.parse(replyTo) : null;
-
 
   try {
     const moderationResult = await moderateChatMessage({ text });
@@ -252,26 +237,11 @@ export async function sendMessage(formData: FormData) {
         }
     }
 
-    revalidatePath(`/chat/${chatId}`);
     return { success: true };
 
   } catch (e) {
     console.error(e)
     return { error: 'Failed to send message.' };
-  }
-}
-
-export async function updateUserPresence(userId: string, isOnline: boolean) {
-  if (!userId) return;
-  const { firestore: db } = initializeFirebase();
-  const userRef = doc(db, 'users', userId);
-  try {
-    await updateDoc(userRef, {
-      isOnline,
-      lastSeen: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("Error updating user presence:", error);
   }
 }
 
@@ -289,25 +259,20 @@ export async function updateUserProfile({ displayName, photoURL }: { displayName
       updatePayload.photoURL = photoURL;
     }
 
-    // 1. Update Firebase Auth user profile
     await updateProfile(user, updatePayload);
 
-    // 2. Update user document in /users
     const userRef = doc(db, 'users', user.uid);
     await updateDoc(userRef, updatePayload);
     
-    // 3. Update denormalized user data in all relevant chats
     const chatsQuery = query(collection(db, 'chats'), where('users', 'array-contains', user.uid));
     const chatsSnapshot = await getDocs(chatsQuery);
 
     if (!chatsSnapshot.empty) {
         const batch = writeBatch(db);
-        
         chatsSnapshot.forEach(chatDoc => {
             const chatRef = doc(db, 'chats', chatDoc.id);
             const currentChatData = chatDoc.data();
             const currentUserDetails = currentChatData.userDetails[user.uid];
-            
             batch.update(chatRef, {
                 [`userDetails.${user.uid}`]: { ...currentUserDetails, ...updatePayload }
             });
@@ -335,19 +300,13 @@ export async function reactToMessage(chatId: string, messageId: string, userId: 
         }
         
         const reactions = messageDoc.data().reactions || {};
-        const fieldPath = `reactions.${userId}`;
-
         if (reactions[userId] === emoji) {
-            // Un-react: field needs to be deleted, which is complex with dot notation.
-            // It's easier to overwrite the map.
             delete reactions[userId];
             await updateDoc(messageRef, { reactions });
         } else {
-             await updateDoc(messageRef, { [fieldPath]: emoji });
+             await updateDoc(messageRef, { [`reactions.${userId}`]: emoji });
         }
-
         return { success: true };
-
     } catch (e) {
         return { error: "Failed to react to message." };
     }
@@ -355,15 +314,10 @@ export async function reactToMessage(chatId: string, messageId: string, userId: 
 
 export async function editMessage(chatId: string, messageId: string, newText: string) {
     if (newText.trim() === '') return { error: "Message cannot be empty."};
-    
     const { firestore: db } = initializeFirebase();
     const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
-    
     try {
-        await updateDoc(messageRef, {
-            text: newText,
-            edited: true,
-        });
+        await updateDoc(messageRef, { text: newText, edited: true });
         return { success: true };
     } catch(e) {
         return { error: "Failed to edit message." };
@@ -373,12 +327,11 @@ export async function editMessage(chatId: string, messageId: string, newText: st
 export async function deleteMessage(chatId: string, messageId: string) {
     const { firestore: db } = initializeFirebase();
     const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
-
     try {
         await updateDoc(messageRef, {
             text: "This message was deleted.",
             isDeleted: true,
-            reactions: {} // Clear reactions on delete
+            reactions: {}
         });
         return { success: true };
     } catch(e) {
@@ -389,22 +342,18 @@ export async function deleteMessage(chatId: string, messageId: string) {
 async function toggleUserArrayField(userId: string, chatId: string, field: 'pinnedChats' | 'mutedChats' | 'archivedChats') {
     const { firestore: db } = initializeFirebase();
     const userRef = doc(db, 'users', userId);
-
     try {
         const userDoc = await getDoc(userRef);
         if (!userDoc.exists()) {
             return { error: "User not found." };
         }
-        
         const array = userDoc.data()[field] || [];
         if (array.includes(chatId)) {
             await updateDoc(userRef, { [field]: arrayRemove(chatId) });
         } else {
             await updateDoc(userRef, { [field]: arrayUnion(chatId) });
         }
-
         return { success: true };
-
     } catch (e) {
         return { error: `Failed to update ${field}.` };
     }
@@ -422,17 +371,13 @@ export async function toggleArchiveChat(userId: string, chatId: string) {
     return toggleUserArrayField(userId, chatId, 'archivedChats');
 }
 
-
 export async function updateTypingStatus(chatId: string, userId: string, isTyping: boolean) {
     if(!chatId || !userId) return;
     const { firestore: db } = initializeFirebase();
     const chatRef = doc(db, 'chats', chatId);
     try {
-        await updateDoc(chatRef, {
-            [`typing.${userId}`]: isTyping
-        });
+        await updateDoc(chatRef, { [`typing.${userId}`]: isTyping });
     } catch(e) {
-        // Don't need to show error to user for this
         console.error("Failed to update typing status:", e);
     }
 }

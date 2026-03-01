@@ -7,7 +7,7 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
     function isParticipant(userList) {
@@ -24,27 +24,20 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get, list: if isSignedIn();
-      // Allow user to create their own profile
-      allow create: if isOwner(userId);
-      // Allow user to update their display name, photo, and chat preferences
-      allow update: if isOwner(userId) && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'isOnline', 'lastSeen', 'pinnedChats', 'mutedChats', 'archivedChats']);
-      // A user can delete their own profile document.
-      allow delete: if isOwner(userId);
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
     }
 
     match /chats/{chatId} {
       allow list: if isSignedIn();
       allow create: if isSignedIn() && isParticipant(request.resource.data.users);
       allow get, delete: if isSignedIn() && isParticipant(resource.data.users);
-      // Allow participants to update chat metadata like lastMessage, unreadCounts, and typing status.
       allow update: if isSignedIn() && isParticipant(resource.data.users);
     }
 
     match /chats/{chatId}/messages/{messageId} {
       allow get, list: if isParentChatParticipant(chatId);
       allow create: if isParentChatParticipant(chatId) && isSender(request.resource.data);
-      // Allow sender to update/delete their message.
       allow update, delete: if isParentChatParticipant(chatId) && isSender(resource.data);
     }
   }

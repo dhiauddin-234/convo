@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@/firebase/provider';
+import { useUser, useFirestore } from '@/firebase/provider';
 import { useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { Loader2, LogOut, MessageSquare, User, Users } from 'lucide-react';
@@ -10,32 +10,53 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserAvatar } from '@/components/UserAvatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { signOut, updateUserPresence } from '@/app/actions';
+import { signOut } from '@/app/actions';
 import { SidebarChats } from '@/components/chat/SidebarChats';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 function PresenceUpdater() {
   const { user } = useUser();
+  const db = useFirestore();
   
   useEffect(() => {
-    if (user?.uid) {
-      updateUserPresence(user.uid, true);
-      
-      const handleBeforeUnload = () => {
-        // This might not run reliably, especially on mobile.
-        // Firestore's offline capabilities help, but for real-time presence,
-        // a more robust solution like RTDB's onDisconnect is better.
-        updateUserPresence(user.uid, false);
-      };
+    if (!user?.uid || !db) return;
 
-      window.addEventListener('beforeunload', handleBeforeUnload);
+    const userRef = doc(db, 'users', user.uid);
+    
+    const setStatus = async (isOnline: boolean) => {
+      try {
+        await updateDoc(userRef, {
+          isOnline,
+          lastSeen: serverTimestamp(),
+        });
+      } catch (error) {
+        // Silently fail for presence to avoid disruptive errors
+        console.debug("Presence update failed:", error);
+      }
+    };
 
-      return () => {
-        updateUserPresence(user.uid, false);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-      };
-    }
-  }, [user?.uid]);
+    // Mark online on mount
+    setStatus(true);
+
+    // Heartbeat every 2 minutes to keep lastSeen fresh
+    const heartbeat = setInterval(() => setStatus(true), 120000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setStatus(true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(heartbeat);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Try to mark offline on unmount, but don't wait for it
+      setStatus(false);
+    };
+  }, [user?.uid, db]);
 
   return null;
 }
@@ -43,6 +64,7 @@ function PresenceUpdater() {
 
 export default function MainLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading: loading } = useUser();
+  const db = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -51,6 +73,21 @@ export default function MainLayout({ children }: { children: ReactNode }) {
       router.replace('/login');
     }
   }, [user, loading, router]);
+
+  const handleLogout = async () => {
+    if (user?.uid && db) {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          isOnline: false,
+          lastSeen: serverTimestamp(),
+        });
+      } catch (e) {
+        console.error("Logout presence update failed:", e);
+      }
+    }
+    await signOut();
+  };
 
   if (loading || !user) {
     return (
@@ -97,7 +134,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                          <Button variant="ghost" className="h-12 w-full justify-start gap-2 px-2">
-                             <UserAvatar user={user} className="h-8 w-8"/>
+                             <UserAvatar user={user as any} className="h-8 w-8"/>
                              <div className="flex flex-col items-start group-data-[collapsed=icon]:hidden">
                                 <span className="font-medium">{user.displayName}</span>
                                 <span className="text-xs text-muted-foreground">{user.email}</span>
@@ -112,11 +149,9 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                         </DropdownMenuItem>
                         <ThemeToggle />
                         <DropdownMenuSeparator />
-                        <form action={signOut}>
-                            <DropdownMenuItem asChild>
-                                <button className="w-full" type="submit"><LogOut className="mr-2 h-4 w-4" />Logout</button>
-                            </DropdownMenuItem>
-                        </form>
+                        <DropdownMenuItem onClick={handleLogout}>
+                            <LogOut className="mr-2 h-4 w-4" />Logout
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarFooter>
