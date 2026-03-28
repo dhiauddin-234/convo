@@ -1,0 +1,194 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile in the Convo application.",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique identifier for the user profile, from Firebase Auth."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name, shown in the app."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL of the user's profile picture.",
+          "format": "uri"
+        },
+        "lastSeen": {
+          "type": "string",
+          "description": "Timestamp of the user's last activity.",
+          "format": "date-time"
+        },
+        "isOnline": {
+          "type": "boolean",
+          "description": "Boolean indicating whether the user is currently online."
+        },
+        "pinnedChats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of chat IDs that the user has pinned."
+        },
+        "mutedChats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of chat IDs that the user has muted."
+        },
+        "archivedChats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of chat IDs that the user has archived."
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName"
+      ]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single chat message.",
+      "properties": {
+        "senderId": {
+          "type": "string",
+          "description": "The ID of the user who sent the message."
+        },
+        "chatId": {
+          "type": "string",
+          "description": "The unique identifier of the chat room the message belongs to."
+        },
+        "text": {
+          "type": "string",
+          "description": "The text content of the message."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of when the message was sent.",
+          "format": "date-time"
+        },
+        "isModerated": {
+          "type": "boolean",
+          "description": "Indicates whether the message has been moderated."
+        },
+        "reactions": {
+          "type": "object",
+          "description": "A map of user IDs to their emoji reaction.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "Indicates if the message has been soft-deleted."
+        },
+        "edited": {
+          "type": "boolean",
+          "description": "Indicates if the message has been edited."
+        },
+        "replyTo": {
+          "type": "object",
+          "description": "Reference to a message this one is a reply to.",
+          "properties": {
+            "messageId": { "type": "string" },
+            "senderId": { "type": "string" },
+            "textPreview": { "type": "string" }
+          },
+          "required": ["messageId", "senderId", "textPreview"]
+        },
+        "type": {
+            "type": "string",
+            "enum": ["user", "system"],
+            "description": "The type of message (user-generated or system-generated)."
+        }
+      },
+      "required": [
+        "senderId",
+        "chatId",
+        "text",
+        "createdAt"
+      ]
+    },
+    "ChatRoom": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatRoom",
+      "type": "object",
+      "description": "Represents a one-to-one chat room between two users.",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array containing the UIDs of the two users in the chat room."
+        },
+        "userDetails": {
+          "type": "object",
+          "description": "Map containing the user profiles of the chat participants."
+        },
+        "lastMessage": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "readBy": { "type": "array", "items": { "type": "string" } }
+          },
+          "description": "The last message sent in the chat room."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of when the chat room was created.",
+          "format": "date-time"
+        },
+        "unreadCounts": {
+          "type": "object",
+          "description": "A map of user IDs to their unread message count.",
+          "additionalProperties": { "type": "number" }
+        },
+        "typing": {
+            "type": "object",
+            "description": "A map of user IDs to their typing status.",
+            "additionalProperties": { "type": "boolean" }
+        }
+      },
+      "required": [
+        "users"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores user profiles. Uses the document ID as the user ID for ownership."
+    },
+    "/chats/{chatId}": {
+      "schema": {
+        "$ref": "#/entities/ChatRoom"
+      },
+      "description": "Stores chat room metadata. `users` array defines the members of the chat."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": {
+        "$ref": "#/entities/ChatMessage"
+      },
+      "description": "Stores chat messages within chat rooms."
+    }
+  }
+}
