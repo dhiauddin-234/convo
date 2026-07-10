@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -24,6 +25,14 @@
           "description": "URL of the user's profile picture.",
           "format": "uri"
         },
+        "bio": {
+          "type": "string",
+          "description": "Short user biography."
+        },
+        "status": {
+          "type": "string",
+          "description": "User's current status message (e.g., 'Busy', 'At the gym')."
+        },
         "lastSeen": {
           "type": "string",
           "description": "Timestamp of the user's last activity.",
@@ -33,20 +42,37 @@
           "type": "boolean",
           "description": "Boolean indicating whether the user is currently online."
         },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark", "system"],
+          "default": "system"
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "notificationsEnabled": { "type": "boolean", "default": true },
+            "readReceipts": { "type": "boolean", "default": true }
+          }
+        },
         "pinnedChats": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Array of chat IDs that the user has pinned."
+          "items": { "type": "string" }
         },
         "mutedChats": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Array of chat IDs that the user has muted."
+          "items": { "type": "string" }
         },
         "archivedChats": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Array of chat IDs that the user has archived."
+          "items": { "type": "string" }
         }
       },
       "required": [
@@ -67,51 +93,25 @@
         },
         "chatId": {
           "type": "string",
-          "description": "The unique identifier of the chat room the message belongs to."
+          "description": "The unique identifier of the chat room."
         },
         "text": {
-          "type": "string",
-          "description": "The text content of the message."
+          "type": "string"
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp of when the message was sent.",
           "format": "date-time"
-        },
-        "isModerated": {
-          "type": "boolean",
-          "description": "Indicates whether the message has been moderated."
-        },
-        "reactions": {
-          "type": "object",
-          "description": "A map of user IDs to their emoji reaction.",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "isDeleted": {
-          "type": "boolean",
-          "description": "Indicates if the message has been soft-deleted."
-        },
-        "edited": {
-          "type": "boolean",
-          "description": "Indicates if the message has been edited."
-        },
-        "replyTo": {
-          "type": "object",
-          "description": "Reference to a message this one is a reply to.",
-          "properties": {
-            "messageId": { "type": "string" },
-            "senderId": { "type": "string" },
-            "textPreview": { "type": "string" }
-          },
-          "required": ["messageId", "senderId", "textPreview"]
         },
         "type": {
             "type": "string",
-            "enum": ["user", "system"],
-            "description": "The type of message (user-generated or system-generated)."
-        }
+            "enum": ["user", "system"]
+        },
+        "reactions": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "edited": { "type": "boolean" },
+        "isDeleted": { "type": "boolean" }
       },
       "required": [
         "senderId",
@@ -124,41 +124,18 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ChatRoom",
       "type": "object",
-      "description": "Represents a one-to-one chat room between two users.",
+      "description": "Represents a chat room.",
       "properties": {
         "users": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Array containing the UIDs of the two users in the chat room."
+          "items": { "type": "string" }
         },
-        "userDetails": {
-          "type": "object",
-          "description": "Map containing the user profiles of the chat participants."
-        },
-        "lastMessage": {
-          "type": "object",
-          "properties": {
-            "text": { "type": "string" },
-            "createdAt": { "type": "string", "format": "date-time" },
-            "readBy": { "type": "array", "items": { "type": "string" } }
-          },
-          "description": "The last message sent in the chat room."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp of when the chat room was created.",
-          "format": "date-time"
-        },
-        "unreadCounts": {
-          "type": "object",
-          "description": "A map of user IDs to their unread message count.",
-          "additionalProperties": { "type": "number" }
-        },
-        "typing": {
-            "type": "object",
-            "description": "A map of user IDs to their typing status.",
-            "additionalProperties": { "type": "boolean" }
-        }
+        "isGroup": { "type": "boolean", "default": false },
+        "name": { "type": "string" },
+        "userDetails": { "type": "object" },
+        "lastMessage": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "unreadCounts": { "type": "object" }
       },
       "required": [
         "users"
@@ -168,7 +145,7 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "google.com"
     ]
   },
   "firestore": {
@@ -176,19 +153,19 @@
       "schema": {
         "$ref": "#/entities/UserProfile"
       },
-      "description": "Stores user profiles. Uses the document ID as the user ID for ownership."
+      "description": "Stores user profiles."
     },
     "/chats/{chatId}": {
       "schema": {
         "$ref": "#/entities/ChatRoom"
       },
-      "description": "Stores chat room metadata. `users` array defines the members of the chat."
+      "description": "Stores chat metadata."
     },
     "/chats/{chatId}/messages/{messageId}": {
       "schema": {
         "$ref": "#/entities/ChatMessage"
       },
-      "description": "Stores chat messages within chat rooms."
+      "description": "Stores chat messages."
     }
   }
 }

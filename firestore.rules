@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -7,11 +8,11 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function isParticipant(userList) {
-      return request.auth.uid in userList;
+      return isSignedIn() && request.auth.uid in userList;
     }
 
     function isParentChatParticipant(chatId) {
@@ -19,12 +20,9 @@ service cloud.firestore {
       return chatDoc != null && isParticipant(chatDoc.data.users);
     }
 
-    function isSender(messageData) {
-      return request.auth.uid == messageData.senderId;
-    }
-
     match /users/{userId} {
       allow read: if isSignedIn();
+      // Allow owners full control over their document to ensure background syncing works
       allow write: if isOwner(userId);
     }
 
@@ -37,8 +35,8 @@ service cloud.firestore {
 
     match /chats/{chatId}/messages/{messageId} {
       allow get, list: if isParentChatParticipant(chatId);
-      allow create: if isParentChatParticipant(chatId) && isSender(request.resource.data);
-      allow update, delete: if isParentChatParticipant(chatId) && isSender(resource.data);
+      allow create: if isParentChatParticipant(chatId) && request.auth.uid == request.resource.data.senderId;
+      allow update, delete: if isParentChatParticipant(chatId) && request.auth.uid == resource.data.senderId;
     }
   }
 }
