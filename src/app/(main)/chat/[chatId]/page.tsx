@@ -70,7 +70,10 @@ export default function ChatRoomPage() {
 
     const handleReply = (message: Message) => {
         setReplyToMessage(message);
-        document.getElementById('message-input')?.focus();
+        // Focus the input after a small delay to ensure DOM is ready
+        setTimeout(() => {
+             document.getElementById('message-input')?.focus();
+        }, 100);
     };
 
     const cancelReply = () => {
@@ -93,7 +96,7 @@ export default function ChatRoomPage() {
     const isTyping = chat?.typing?.[otherUser.uid] ?? false;
 
     return (
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-[100dvh] w-full overflow-hidden bg-background">
             <ChatHeader otherUser={otherUser} isTyping={isTyping} />
             <MessageList chatId={chatId} currentUserId={currentUserId} onReply={handleReply} participants={chat.userDetails}/>
             <MessageInput 
