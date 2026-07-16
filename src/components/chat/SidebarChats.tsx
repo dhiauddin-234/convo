@@ -7,7 +7,7 @@ import type { AppUser, Chat } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/utils';
+import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/UserAvatar';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
